@@ -31,7 +31,8 @@
     "dist/",
     "corpus-free/",
     "postinstall.mjs",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "docs/FACTS-CONTRACT.md"
   ],
   "workspaces": [
     "packages/*"
