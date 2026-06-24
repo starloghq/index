@@ -16,6 +16,9 @@ cd "$ROOT"
 VERSION="$(node -p "require('./package.json').version")"
 echo "=== verify-release: starloghq@$VERSION ==="
 
+echo "--- version consistency (package.json <-> server.json) ---"
+node scripts/check-versions.mjs
+
 echo "--- build ---"
 npm run build >/dev/null
 

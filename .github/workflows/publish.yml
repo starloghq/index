@@ -34,6 +34,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Fail fast before the expensive build/test: every version field in
+      # package.json and server.json must agree, and (on this tag push) equal
+      # the tag. Supersedes the old package.json-only tag check — also guards
+      # the MCP-registry manifest (server.json) that used to drift unnoticed.
+      - name: Check version consistency (and tag match)
+        run: npm run check:versions
+
       # Build BEFORE tests: the facts CLI e2e tests spawn the built dist/cli.js.
       # Running tests first made them fail with "Cannot find module dist/cli.js"
       # (this blocked the v0.2.0 publish). Mirrors the ci.yml ordering.
@@ -53,11 +60,6 @@ jobs:
 
       - name: Smoke-test the packed tarball
         run: STARLOG_TARBALL="$GITHUB_WORKSPACE/$TARBALL" STARLOG_EXPECT_VERSION="$PKG_VERSION" bash scripts/smoke-test.sh
-
-      - name: Verify tag matches package.json version
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          [ "$TAG" = "$PKG_VERSION" ] || { echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VERSION}"; exit 1; }
 
       - name: Publish to npm (OIDC, with provenance)
         # Blank the dummy token that actions/setup-node writes into .npmrc
