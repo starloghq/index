@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scrubText, parseState, needsNotice, NOTICE_VERSION, TELEMETRY_NOTICE } from './telemetry.js';
+import { scrubText, parseState, needsNotice, isInternalUser, NOTICE_VERSION, TELEMETRY_NOTICE } from './telemetry.js';
 
 /**
  * scrubText is the load-bearing privacy guard: verbatim query/context strings
@@ -84,5 +84,20 @@ describe('consent notice versioning (re-consent on upgrade)', () => {
     expect(TELEMETRY_NOTICE.toLowerCase()).toContain('quer'); // discloses query capture
     expect(TELEMETRY_NOTICE.toLowerCase()).toContain('package');
     expect(TELEMETRY_NOTICE.toLowerCase()).not.toContain('never your queries');
+  });
+});
+
+describe('isInternalUser — $internal_or_test_user opt-in (STARLOG_INTERNAL)', () => {
+  it('is true only for truthy STARLOG_INTERNAL values', () => {
+    for (const v of ['1', 'true', 'yes', 'on', 'TRUE', 'On']) {
+      expect(isInternalUser({ STARLOG_INTERNAL: v })).toBe(true);
+    }
+  });
+
+  it('is false when unset or explicitly falsy (default: not internal)', () => {
+    expect(isInternalUser({})).toBe(false);
+    for (const v of ['', '0', 'false', 'no', 'off']) {
+      expect(isInternalUser({ STARLOG_INTERNAL: v })).toBe(false);
+    }
   });
 });

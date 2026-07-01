@@ -127,6 +127,17 @@ function isFalsy(v: string | undefined): boolean {
   return v != null && /^(0|false|no|off)$/i.test(v);
 }
 
+/**
+ * Internal/dev traffic opt-in (default off). When `STARLOG_INTERNAL` is truthy,
+ * events carry the `$internal_or_test_user` marker so founder / CI-with-telemetry
+ * usage is excluded from product analytics via PostHog's matching test-user cohort
+ * — otherwise a low-traffic project's funnels are dominated by our own runs. Env is
+ * a parameter so this stays pure and unit-testable.
+ */
+export function isInternalUser(env: NodeJS.ProcessEnv = process.env): boolean {
+  return isTruthy(env.STARLOG_INTERNAL);
+}
+
 /** Resolve whether telemetry should run, honoring env + flags + persisted state. */
 function resolveEnabled(state: State, noTelemetryFlag: boolean): boolean {
   if (noTelemetryFlag) return false;
@@ -164,6 +175,11 @@ async function send(event: string, distinctId: string, properties: Record<string
           os: platform(),
           arch: arch(),
           ...properties,
+          // Internal/dev marker last so it always wins: event prop for PostHog's
+          // built-in test-user filter + $set for the person-property cohort.
+          ...(isInternalUser()
+            ? { $internal_or_test_user: true, $set: { $internal_or_test_user: true } }
+            : {}),
         },
       }),
       signal: controller.signal,

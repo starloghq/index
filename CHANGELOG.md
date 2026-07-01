@@ -2,6 +2,10 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## Unreleased
+
+- **Internal-traffic marker for analytics (`STARLOG_INTERNAL`).** Set `STARLOG_INTERNAL=1` on dev machines / CI-with-telemetry and events now carry `$internal_or_test_user` — both as an event property (PostHog's built-in test-user filter) and via `$set` as a person property (the "Internal / Test users" cohort) — so founder/test runs are excluded from product analytics. On a low-traffic project our own runs otherwise dominate the funnels. **Off by default**: real users are unaffected, nothing new is collected, and the opt-out env vars are unchanged.
+
 ## 0.6.0
 
 - **Full hosted corpus tier for `starlog_search`.** The package bundles only the small `corpus-free` tier; with `STARLOG_API_KEY` set, `runSearch` now pulls the candidate set from the hosted full corpus (`api.starlog.dev/search`) and ranks it with the **same local engine** — a key widens *what* can be found, never *how* it's scored. Mirrors the facts client: Bearer auth, short abort timeout, defensive parsing, **never throws** — any hosted failure (no key, network, non-200, garbage body) silently degrades to the bundled corpus, so keyless users are unaffected.
