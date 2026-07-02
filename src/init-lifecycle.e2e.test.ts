@@ -236,6 +236,9 @@ describe('starlog init / doctor lifecycle (e2e, spawned binary)', () => {
     const wire = runCli(['init', '--api-key', 'sk-org-abc123', '-y'], { home, proj });
     expect(wire.status).toBe(0);
     expect(readSettings(home).mcpServers.starlog.env.STARLOG_API_KEY).toBe('sk-org-abc123');
+    // A wired key reports the hosted tier and does NOT nag about getting a key.
+    expect(wire.stdout).toContain('Ranking mode: hosted');
+    expect(wire.stdout).not.toContain('Get a key at https://starlog.dev');
 
     // Step 3 — plain re-init, no flag, no env var. init recomputes the MCP entry
     // wholesale with no key, so the key is silently DROPPED. This is the
@@ -246,6 +249,9 @@ describe('starlog init / doctor lifecycle (e2e, spawned binary)', () => {
     expect(plain.status).toBe(0);
     expect(plain.stdout).toContain('[~ update] Claude Code · MCP server');
     expect(readSettings(home).mcpServers.starlog.env.STARLOG_API_KEY).toBeUndefined();
+    // Keyless: default keyword tier, plus the self-serve pointer to the hosted upgrade.
+    expect(plain.stdout).toContain('Ranking mode: keyword');
+    expect(plain.stdout).toContain('https://starlog.dev');
 
     // Step 4 — the env-var route restores the key without --api-key, confirming
     // init honors an exported STARLOG_API_KEY.

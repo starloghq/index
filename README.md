@@ -49,7 +49,7 @@ You can't fix recall by prompting harder. **Starlog puts authoritative, dated fa
 - **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and **surfaces that package's facts** (known incidents, license, maintenance) *before* the agent builds on it. Advisory — it informs the next move, it doesn't block the install. Packages with no record are queued for coverage.
 - **`starlog_search` MCP tool** — discovery: find candidate packages for a capability (org-sanctioned options first), then vet the named pick with `starlog_facts`. Discovery surfaces what exists; facts vet it.
 - **`starlog facts` / `starlog search` CLI** — the same facts and discovery from your terminal.
-- **Runs on your machine** — the engine and corpus are local; the default (keyless) path needs no account, no API key, and no network. Setting `STARLOG_API_KEY` opts into the hosted facts/search tiers (with local fallback); anonymous, opt-out usage telemetry is the only thing sent otherwise — see [Telemetry](#telemetry).
+- **Runs on your machine** — the engine and corpus are local; the default (keyless) path needs no account, no API key, and no network. Setting `STARLOG_API_KEY` opts into the hosted facts/search tiers (with local fallback) — get a key at [starlog.dev](https://starlog.dev) and wire it with `starlog init --api-key <key>`; anonymous, opt-out usage telemetry is the only thing sent otherwise — see [Telemetry](#telemetry).
 
 This repo ships the engine plus a curated **facts corpus of 42 packages** and a discovery corpus of **25 capability manifests across 7 categories**.
 

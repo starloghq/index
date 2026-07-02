@@ -183,7 +183,7 @@ program
   .option('--dry-run', 'Preview the changes without writing anything')
   .option('-y, --yes', 'Apply changes without the confirmation prompt (for CI/non-interactive use)')
   .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
-  .option('--api-key <key>', 'Wire your org STARLOG_API_KEY into the MCP server (enables hosted org-private facts for your agent)')
+  .option('--api-key <key>', 'Wire your org STARLOG_API_KEY into the MCP server (enables hosted org-private facts for your agent) — get a key at https://starlog.dev')
   .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string }) => {
     await runInit(opts);
 

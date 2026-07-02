@@ -243,17 +243,24 @@ async function checkProjectAgents(projectDir: string): Promise<Check[]> {
 
 // ── Ranking mode (informational) ─────────────────────────────────────────────
 
-type RankingTier = 'keyword';
+type RankingTier = 'keyword' | 'hosted';
 
-// Keyword ranking is the default and only ranking mode — offline, no key, no
-// network. This matches the keyword-only runtime exactly (FIRST-03 / D-06).
-function rankingState(): { tier: RankingTier; detail: string } {
-  return { tier: 'keyword', detail: 'keyword ranking — offline, no key, no network (the default)' };
+// Keyword ranking is the default; a wired STARLOG_API_KEY opts into the hosted
+// tier (full corpus + org-private facts). Scoring stays local either way — the
+// key only widens what can be found (FIRST-03 / D-06).
+function rankingState(settings: Record<string, unknown> | null): { tier: RankingTier; detail: string } {
+  if (mcpEnv(settings)?.STARLOG_API_KEY) {
+    return { tier: 'hosted', detail: 'hosted ranking — full corpus + org-private facts (STARLOG_API_KEY wired)' };
+  }
+  return {
+    tier: 'keyword',
+    detail: 'keyword ranking — offline, no key, no network (the default). Hosted tier available — get a key at https://starlog.dev, then `starlog init --api-key <key>`',
+  };
 }
 
-// Keyword ranking is the recommended default, reported as OK — never a warning.
-async function checkRanker(): Promise<Check> {
-  return { level: 'ok', label: 'Ranking', detail: rankingState().detail };
+// Both tiers are valid setups, reported as OK — never a warning.
+async function checkRanker(settings: Record<string, unknown> | null): Promise<Check> {
+  return { level: 'ok', label: 'Ranking', detail: rankingState(settings).detail };
 }
 
 // ── Private overlays (vetting + discovery + policy) ──────────────────────────
@@ -328,7 +335,7 @@ export async function runDoctor(): Promise<number> {
   checks.push(...(await checkHook(settings)));
   checks.push(...(await checkPrivateOverlays(settings, projectDir)));
   checks.push(...(await checkProjectAgents(projectDir)));
-  checks.push(await checkRanker());
+  checks.push(await checkRanker(settings));
 
   for (const c of checks) print(c);
 

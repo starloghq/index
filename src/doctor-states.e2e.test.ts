@@ -162,6 +162,35 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
     }
   });
 
+  // 2b. RANKING TIER — keyword (default) points to the hosted upgrade; a wired
+  //     STARLOG_API_KEY in the MCP env flips the report to the hosted tier and
+  //     drops the upgrade nudge. Both are OK states (exit 0).
+  it('reports the keyword tier with a hosted-upgrade pointer, and the hosted tier when a key is wired', () => {
+    const mcpServer = (env: Record<string, string>) => ({
+      mcpServers: { starlog: { command: 'node', args: ['/x/dist/mcp.js'], env } },
+    });
+
+    // ---- Keyword (no key wired): self-serve pointer to starlog.dev ----
+    // (Exit code is driven by the bogus MCP path, not ranking — ranking prints
+    // on every run regardless, so this scenario asserts only the ranking line.)
+    {
+      const { home, cwd } = freshDirs();
+      writeSettings(home, mcpServer({}));
+      const { stdout } = runDoctor(cwd, home);
+      expect(stdout).toContain('keyword ranking');
+      expect(stdout).toContain('https://starlog.dev');
+    }
+
+    // ---- Hosted (key wired into the MCP env): no upgrade nudge ----
+    {
+      const { home, cwd } = freshDirs();
+      writeSettings(home, mcpServer({ STARLOG_API_KEY: 'sk-org-abc123' }));
+      const { stdout } = runDoctor(cwd, home);
+      expect(stdout).toContain('hosted ranking');
+      expect(stdout).not.toContain('get a key at https://starlog.dev');
+    }
+  });
+
   // 3. CORRUPT settings.json — flagged as invalid, NOT mistaken for "not configured".
   // Malformed bytes ('{ broken json ') must surface a '[x]  settings.json — invalid JSON ('
   // problem with 'fix or remove' + 'starlog init' guidance, exit 1. Crucially, doctor

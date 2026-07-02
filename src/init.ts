@@ -738,12 +738,18 @@ function isEphemeralInstall(): boolean {
 }
 
 /** Post-install guidance: what's active, what to do next, and any caveats. */
-function printPostInstallSummary(): void {
+function printPostInstallSummary(apiKey?: string): void {
   console.log('\nDone! Next steps:');
   console.log('  1. Restart your AI coding agent so it loads the MCP server.');
   console.log('  2. Run `starlog doctor` to confirm everything is wired up.');
 
-  console.log('\nRanking mode: keyword — offline, no key, no setup (the default).');
+  if (apiKey) {
+    console.log('\nRanking mode: hosted — full corpus + org-private facts (STARLOG_API_KEY wired).');
+  } else {
+    console.log('\nRanking mode: keyword — offline, no key, no setup (the default).');
+    console.log('Want hosted ranking (full corpus) + org-private facts? Get a key at https://starlog.dev, then:');
+    console.log('  starlog init --api-key <key>');
+  }
 
   console.log('\nYour agent will now vet packages with `starlog_facts` before adopting them.');
   console.log('Try it now:  starlog facts <a package you already use>');
@@ -818,7 +824,7 @@ export async function runInit(opts: InitOpts): Promise<void> {
 
   if (changes.length === 0) {
     console.log('\nEverything is already configured. No changes needed.');
-    printPostInstallSummary();
+    printPostInstallSummary(apiKey);
     return;
   }
 
@@ -853,5 +859,5 @@ export async function runInit(opts: InitOpts): Promise<void> {
     await item.apply();
     console.log(`  [done] ${item.label}`);
   }
-  printPostInstallSummary();
+  printPostInstallSummary(apiKey);
 }
