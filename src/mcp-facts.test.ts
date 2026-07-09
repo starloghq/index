@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -7,7 +7,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { createServer, FACTS_TOOL_DESCRIPTION } from './mcp.js';
 import { buildManifestFromInput } from './engine/facts/authoring.js';
-import { getOrgCorpusPackageIds } from './engine/org-corpus.js';
+import { getOrgCorpusPackageIds, resetOrgCorpusPackageIdsForTests } from './engine/org-corpus.js';
 import * as telemetry from './telemetry.js';
 
 /**
@@ -149,7 +149,12 @@ describe('starlog MCP server — org corpus telemetry redaction', () => {
   );
   const orgManifest = { ...drizzle, id: '@acme/org-only', name: '@acme/org-only' };
 
+  beforeEach(() => {
+    resetOrgCorpusPackageIdsForTests();
+  });
+
   afterEach(() => {
+    resetOrgCorpusPackageIdsForTests();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -186,6 +191,43 @@ describe('starlog MCP server — org corpus telemetry redaction', () => {
     } as unknown as Response);
     await callPromise;
 
+    expect(getOrgCorpusPackageIds().has('@acme/org-only')).toBe(true);
+    expect(trackSpy).toHaveBeenCalledWith(
+      'mcp_facts',
+      expect.objectContaining({ package: null, private: true }),
+      expect.objectContaining({ surface: 'mcp' }),
+    );
+    await client.close();
+  });
+
+  it('retries org corpus fetch on mcp_facts when the warm fetch failed (no permanent redaction gap)', async () => {
+    // Warm fails at createServer; a later facts call must not freeze that empty
+    // id set — otherwise org-internal names leak into telemetry forever.
+    const fetchMock = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('warm network down'))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ manifests: [orgManifest] }),
+      } as unknown as Response);
+    vi.stubEnv('STARLOG_ORG_CORPUS_URL', ORG_URL);
+    vi.stubGlobal('fetch', fetchMock as unknown as typeof fetch);
+
+    const trackSpy = vi.spyOn(telemetry, 'track').mockResolvedValue(undefined);
+
+    const server = createServer();
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'org-redact-retry-test', version: '0.0.0' });
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+
+    // Let the warm settle as a failure before the facts call.
+    await new Promise((r) => setTimeout(r, 20));
+    expect(getOrgCorpusPackageIds().has('@acme/org-only')).toBe(false);
+
+    await client.callTool({ name: 'starlog_facts', arguments: { package: '@acme/org-only' } });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(getOrgCorpusPackageIds().has('@acme/org-only')).toBe(true);
     expect(trackSpy).toHaveBeenCalledWith(
       'mcp_facts',

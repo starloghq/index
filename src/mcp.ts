@@ -78,10 +78,21 @@ export function createServer(): McpServer {
   const server = new McpServer({ name: 'starlog', version: getPackageVersion() });
 
   // Warm org-corpus package-id cache for telemetry redaction (no-op when URL unset).
-  // createServer() stays sync, so we kick the fetch here and await the same
-  // promise in the facts handler before building the redaction set — a sync
-  // snapshot at this point would be empty while the fetch (up to 10s) is in flight.
+  // createServer() stays sync, so we kick the fetch here and ensure ids in the
+  // facts handler before building the redaction set — a sync snapshot at this
+  // point would be empty while the fetch (up to 10s) is in flight. If the warm
+  // fails, one coalesced retry runs on the first facts call so a transient
+  // startup blip does not permanently leak org-internal names into telemetry.
   const orgCorpusWarm = fetchOrgCorpus();
+  let orgCorpusRetry: Promise<unknown> | null = null;
+
+  async function ensureOrgCorpusIdsForRedaction(): Promise<void> {
+    await orgCorpusWarm;
+    if (!process.env.STARLOG_ORG_CORPUS_URL?.trim()) return;
+    if (getOrgCorpusPackageIds().size > 0) return;
+    if (!orgCorpusRetry) orgCorpusRetry = fetchOrgCorpus();
+    await orgCorpusRetry;
+  }
 
   server.tool(
     'starlog_search',
@@ -125,9 +136,9 @@ export function createServer(): McpServer {
         .describe('Optional project context for relevance, e.g. "Next.js SaaS, needs SSO"'),
     },
     async (args) => {
-      // Await the warm so org ids are in the cache before we build the redaction set.
-      // fetchOrgCorpus never throws; failures leave the cache empty (safe degrade).
-      await orgCorpusWarm;
+      // Ensure org ids are in the cache before we build the redaction set.
+      // fetchOrgCorpus never throws; a failed warm gets one coalesced retry.
+      await ensureOrgCorpusIdsForRedaction();
       const privatePackages = new Set([...factsLocal.privatePackages, ...getOrgCorpusPackageIds()]);
       const view = await resolveFactView(args.package, { local: factsLocal, api: factsApi });
       const disclosure = pendingMcpDisclosure();

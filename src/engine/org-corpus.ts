@@ -23,6 +23,11 @@ export function getOrgCorpusPackageIds(): ReadonlySet<string> {
   return cachedPackageIds;
 }
 
+/** Test-only: clear the package-id cache so cases don't leak across files. */
+export function resetOrgCorpusPackageIdsForTests(): void {
+  cachedPackageIds = new Set();
+}
+
 /**
  * Fetch org-shared capability manifests from a company-hosted URL.
  * @returns the manifests, or `null` to signal "skip the org layer".
@@ -58,7 +63,17 @@ export async function fetchOrgCorpus(opts: {
       const parsed = CapabilityManifestSchema.safeParse(entry);
       if (parsed.success) manifests.push(parsed.data);
     }
-    if (manifests.length === 0) return null;
+    if (manifests.length === 0) {
+      // Ops visibility: a 200 with a `manifests` array that all fail schema is a
+      // silent no-op without this — the common failure mode when someone hand-rolls
+      // JSON instead of publishing `starlog corpus add` / `org sync` output.
+      if (entries.length > 0) {
+        console.error(
+          `[starlog] org corpus → 0 of ${entries.length} entries passed schema; skipping org layer. Publish output from \`starlog corpus add\` / \`org sync\`, not a hand-rolled stub.`,
+        );
+      }
+      return null;
+    }
     cachedPackageIds = new Set(manifests.map((m) => m.id));
     return manifests;
   } catch (err) {

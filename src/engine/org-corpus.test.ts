@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -77,6 +77,17 @@ describe('fetchOrgCorpus', () => {
   it('skips schema-invalid entries; null if none survive', async () => {
     const fetchImpl = (async () => okResponse([{ id: 'broken' }])) as unknown as typeof fetch;
     expect(await fetchOrgCorpus({ url: CORPUS_URL, fetchImpl })).toBeNull();
+  });
+
+  it('logs when entries arrived but none survived schema validation (ops visibility)', async () => {
+    const errors: string[] = [];
+    const spy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      errors.push(args.map(String).join(' '));
+    });
+    const fetchImpl = (async () => okResponse([{ id: 'broken' }, { id: 'also-broken' }])) as unknown as typeof fetch;
+    expect(await fetchOrgCorpus({ url: CORPUS_URL, fetchImpl })).toBeNull();
+    expect(errors.some((e) => e.includes('0 of 2') && e.includes('schema'))).toBe(true);
+    spy.mockRestore();
   });
 
   it('records package ids via getOrgCorpusPackageIds() after success', async () => {
