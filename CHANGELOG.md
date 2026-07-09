@@ -4,6 +4,7 @@ All notable changes to `starloghq` are documented here. This project follows [se
 
 ## 0.7.0
 
+- **Company-hosted org discovery corpus (`STARLOG_ORG_CORPUS_URL`).** Companies can host the same `{ manifests }` JSON Starlog already writes locally (e.g. publish `.starlog/private-corpus.json` to static HTTPS). With the URL set, `runSearch` fetches the org layer every run and merges it between the base corpus and the per-machine `STARLOG_PRIVATE_CORPUS` overlay — org + local private ids float private-first; local private still wins on id collision. Optional Bearer auth via `STARLOG_ORG_CORPUS_TOKEN`. Any fetch failure degrades silently (search continues). `starlog init --org-corpus-url` bakes the URL into MCP env; `starlog doctor` reports when wired. Generation (`org sync`, `corpus add`) unchanged.
 - **Internal-traffic marker for analytics (`STARLOG_INTERNAL`).** Set `STARLOG_INTERNAL=1` on dev machines / CI-with-telemetry and events now carry `$internal_or_test_user` — both as an event property (PostHog's built-in test-user filter) and via `$set` as a person property (the "Internal / Test users" cohort) — so founder/test runs are excluded from product analytics. On a low-traffic project our own runs otherwise dominate the funnels. **Off by default**: real users are unaffected, nothing new is collected, and the opt-out env vars are unchanged.
 
 ## 0.6.0

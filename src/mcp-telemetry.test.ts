@@ -55,6 +55,13 @@ describe('mcpFactsEventProps', () => {
     expect(p.used_api).toBe(true);
   });
 
+  it('redacts a name from the org discovery corpus overlay to a boolean', () => {
+    const org = new Set(['@acme/flags']);
+    const p = mcpFactsEventProps({ package: '@acme/flags' }, null, { usedApi: false, privatePackages: org });
+    expect(p.package).toBeNull();
+    expect(p.private).toBe(true);
+  });
+
   it('redacts a private name even on a miss (null view)', () => {
     const priv = new Set(['@acme/internal']);
     const p = mcpFactsEventProps({ package: '@acme/internal' }, null, { usedApi: false, privatePackages: priv });

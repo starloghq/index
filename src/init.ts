@@ -46,7 +46,13 @@ async function writeSettingsJson(settings: Settings): Promise<void> {
 /** The Starlog MCP server entry written into ~/.claude/settings.json. Shared
  *  by the apply path (configureMcpServer) and the preview path (buildInstallPlan)
  *  so the two can never disagree on what "already configured" means. */
-export function desiredMcpServer(apiKey?: string) {
+export interface McpServerOpts {
+  apiKey?: string;
+  orgCorpusUrl?: string;
+  orgCorpusToken?: string;
+}
+
+export function desiredMcpServer(opts: McpServerOpts = {}) {
   // The MCP server is spawned by the agent and does NOT inherit the user's shell
   // environment, so a shell `export STARLOG_PRIVATE_*` never reaches it. Bake the
   // overlay locations into the server's own `env` block instead.
@@ -66,7 +72,10 @@ export function desiredMcpServer(apiKey?: string) {
     STARLOG_POLICY: `${PROJ}/.starlog/policy.json`,
   };
   // Hosted key (org-wide) so the agent can use hosted ranking/facts.
-  if (apiKey) env.STARLOG_API_KEY = apiKey;
+  if (opts.apiKey) env.STARLOG_API_KEY = opts.apiKey;
+  // Company-hosted org discovery corpus (static JSON URL).
+  if (opts.orgCorpusUrl) env.STARLOG_ORG_CORPUS_URL = opts.orgCorpusUrl;
+  if (opts.orgCorpusToken) env.STARLOG_ORG_CORPUS_TOKEN = opts.orgCorpusToken;
 
   return {
     command: 'node',
@@ -76,14 +85,14 @@ export function desiredMcpServer(apiKey?: string) {
   };
 }
 
-async function configureMcpServer(apiKey?: string): Promise<{ changed: boolean }> {
+async function configureMcpServer(opts: McpServerOpts = {}): Promise<{ changed: boolean }> {
   const settings = await readSettingsJson();
   if (!settings.mcpServers || typeof settings.mcpServers !== 'object') {
     settings.mcpServers = {};
   }
   const servers = settings.mcpServers as Record<string, unknown>;
 
-  const desired = desiredMcpServer(apiKey);
+  const desired = desiredMcpServer(opts);
 
   if (JSON.stringify(servers.starlog) === JSON.stringify(desired)) {
     return { changed: false };
@@ -610,11 +619,11 @@ async function cursorAction(projectDir: string): Promise<PlanAction> {
 }
 
 /** Action for the Claude Code MCP server entry in settings.json. */
-async function mcpServerAction(apiKey?: string): Promise<PlanAction> {
+async function mcpServerAction(opts: McpServerOpts = {}): Promise<PlanAction> {
   const settings = await readSettingsJson();
   const servers = (settings.mcpServers ?? {}) as Record<string, unknown>;
   if (!('starlog' in servers)) return 'create';
-  return JSON.stringify(servers.starlog) === JSON.stringify(desiredMcpServer(apiKey))
+  return JSON.stringify(servers.starlog) === JSON.stringify(desiredMcpServer(opts))
     ? 'unchanged'
     : 'update';
 }
@@ -642,7 +651,7 @@ async function hookAction(): Promise<PlanAction> {
 async function buildInstallPlan(
   opts: InitOpts,
   projectDir: string,
-  apiKey?: string,
+  mcpOpts: McpServerOpts = {},
 ): Promise<{ items: PlanItem[]; skipped: SkippedItem[] }> {
   const items: PlanItem[] = [];
   const skipped: SkippedItem[] = [];
@@ -650,8 +659,8 @@ async function buildInstallPlan(
   items.push({
     label: 'Claude Code · MCP server',
     path: tildify(SETTINGS_PATH),
-    action: await mcpServerAction(apiKey),
-    apply: () => configureMcpServer(apiKey),
+    action: await mcpServerAction(mcpOpts),
+    apply: () => configureMcpServer(mcpOpts),
   });
   items.push({
     label: 'Claude Code · PostToolUse hook',
@@ -725,6 +734,8 @@ interface InitOpts {
   yes?: boolean;
   dryRun?: boolean;
   apiKey?: string;
+  orgCorpusUrl?: string;
+  orgCorpusToken?: string;
 }
 
 /**
@@ -738,17 +749,21 @@ function isEphemeralInstall(): boolean {
 }
 
 /** Post-install guidance: what's active, what to do next, and any caveats. */
-function printPostInstallSummary(apiKey?: string): void {
+function printPostInstallSummary(mcpOpts: McpServerOpts = {}): void {
   console.log('\nDone! Next steps:');
   console.log('  1. Restart your AI coding agent so it loads the MCP server.');
   console.log('  2. Run `starlog doctor` to confirm everything is wired up.');
 
-  if (apiKey) {
+  if (mcpOpts.apiKey) {
     console.log('\nRanking mode: hosted — full corpus + org-private facts (STARLOG_API_KEY wired).');
   } else {
     console.log('\nRanking mode: keyword — offline, no key, no setup (the default).');
     console.log('Want hosted ranking (full corpus) + org-private facts? Get a key at https://starlog.dev, then:');
     console.log('  starlog init --api-key <key>');
+  }
+
+  if (mcpOpts.orgCorpusUrl) {
+    console.log('\nOrg discovery corpus: company-hosted URL wired (STARLOG_ORG_CORPUS_URL).');
   }
 
   console.log('\nYour agent will now vet packages with `starlog_facts` before adopting them.');
@@ -772,9 +787,13 @@ function printPostInstallSummary(apiKey?: string): void {
 
 export async function runInit(opts: InitOpts): Promise<void> {
   const projectDir = process.cwd();
-  // An explicit --api-key wins; otherwise pick up an exported STARLOG_API_KEY so
+  // An explicit flag wins; otherwise pick up an exported env var so
   // `STARLOG_API_KEY=... starlog init` also wires the agent.
-  const apiKey = opts.apiKey ?? process.env.STARLOG_API_KEY;
+  const mcpOpts: McpServerOpts = {
+    apiKey: opts.apiKey ?? process.env.STARLOG_API_KEY,
+    orgCorpusUrl: opts.orgCorpusUrl ?? process.env.STARLOG_ORG_CORPUS_URL,
+    orgCorpusToken: opts.orgCorpusToken ?? process.env.STARLOG_ORG_CORPUS_TOKEN,
+  };
 
   if (opts.uninstall) {
     console.log('Starlog — removing integrations...\n');
@@ -804,7 +823,7 @@ export async function runInit(opts: InitOpts): Promise<void> {
     return;
   }
 
-  const { items, skipped } = await buildInstallPlan(opts, projectDir, apiKey);
+  const { items, skipped } = await buildInstallPlan(opts, projectDir, mcpOpts);
   const changes = items.filter((i) => i.action !== 'unchanged');
 
   // ── Preview ──
@@ -824,7 +843,7 @@ export async function runInit(opts: InitOpts): Promise<void> {
 
   if (changes.length === 0) {
     console.log('\nEverything is already configured. No changes needed.');
-    printPostInstallSummary(apiKey);
+    printPostInstallSummary(mcpOpts);
     return;
   }
 
@@ -859,5 +878,5 @@ export async function runInit(opts: InitOpts): Promise<void> {
     await item.apply();
     console.log(`  [done] ${item.label}`);
   }
-  printPostInstallSummary(apiKey);
+  printPostInstallSummary(mcpOpts);
 }

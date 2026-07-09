@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { readJson, checkPrivateOverlays } from './doctor.js';
+import { readJson, checkPrivateOverlays, checkOrgCorpus } from './doctor.js';
 
 let tmpRoot: string;
 
@@ -97,5 +97,27 @@ describe('checkPrivateOverlays() — wiring + per-project authoring visibility',
     await writeFile(join(tmpRoot, '.starlog', 'private-corpus.json'), '{ broken ');
     const checks = await checkPrivateOverlays(WIRED, tmpRoot);
     expect(byLabel(checks, 'Private discovery')?.level).toBe('warn');
+  });
+});
+
+describe('checkOrgCorpus() — optional company-hosted discovery URL', () => {
+  it('reports OK when STARLOG_ORG_CORPUS_URL is wired in MCP env', () => {
+    const settings = {
+      mcpServers: {
+        starlog: {
+          command: 'node',
+          args: ['/x/dist/mcp.js'],
+          env: { STARLOG_ORG_CORPUS_URL: 'https://corp.example.test/corpus.json' },
+        },
+      },
+    };
+    const check = checkOrgCorpus(settings);
+    expect(check?.level).toBe('ok');
+    expect(check?.label).toBe('Org corpus URL wired');
+  });
+
+  it('returns null when org corpus URL is not configured', () => {
+    expect(checkOrgCorpus({ mcpServers: { starlog: { command: 'node', args: [] } } })).toBeNull();
+    expect(checkOrgCorpus(null)).toBeNull();
   });
 });

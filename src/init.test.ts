@@ -219,7 +219,18 @@ describe('desiredMcpServer — per-project private overlays baked into the agent
 
   it('omits the hosted key unless provided, and bakes it when given', () => {
     expect(desiredMcpServer().env.STARLOG_API_KEY).toBeUndefined();
-    expect(desiredMcpServer('sk-test-123').env.STARLOG_API_KEY).toBe('sk-test-123');
+    expect(desiredMcpServer({ apiKey: 'sk-test-123' }).env.STARLOG_API_KEY).toBe('sk-test-123');
+  });
+
+  it('bakes org corpus URL and token only when provided', () => {
+    expect(desiredMcpServer().env.STARLOG_ORG_CORPUS_URL).toBeUndefined();
+    expect(desiredMcpServer().env.STARLOG_ORG_CORPUS_TOKEN).toBeUndefined();
+    const env = desiredMcpServer({
+      orgCorpusUrl: 'https://corp.example.test/corpus.json',
+      orgCorpusToken: 'org-token',
+    }).env;
+    expect(env.STARLOG_ORG_CORPUS_URL).toBe('https://corp.example.test/corpus.json');
+    expect(env.STARLOG_ORG_CORPUS_TOKEN).toBe('org-token');
   });
 
   it('still points at the shipped server entrypoint', () => {

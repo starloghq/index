@@ -184,6 +184,21 @@ starlog facts add @acme/flags --status active --license MIT
 
 These write `.starlog/private-corpus.json` (discovery) and `.starlog/private-facts.json` (vetting) in your project. Because `starlog init` bakes `${CLAUDE_PROJECT_DIR}/.starlog/*` into the MCP server's env, your coding agent picks them up **automatically in that project** — no shell `export`, nothing to re-run. Confirm with `starlog doctor` (it reports the wiring and what each project has authored). For richer overlays — full `l1`/`l2` arrays, org `STARLOG_POLICY` allow/deny verdicts, or pushing to the hosted API with `starlog facts push` — see [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
 
+### Company-hosted discovery corpus
+
+To share the same discovery manifests across every engineer without changing how they're generated, publish your project's `.starlog/private-corpus.json` (or the output of `starlog org sync`) to static HTTPS — S3, Artifactory, an internal CDN, etc. The file shape is `{ "manifests": [ ... ] }`, the same JSON Starlog already writes locally.
+
+```bash
+# Wire the URL into the agent (optional Bearer via STARLOG_ORG_CORPUS_TOKEN):
+starlog init --org-corpus-url https://corp.example.com/starlog/private-corpus.json
+
+# Or export for a one-off CLI shell:
+export STARLOG_ORG_CORPUS_URL=https://corp.example.com/starlog/private-corpus.json
+starlog search "feature flags for node"
+```
+
+`STARLOG_ORG_CORPUS_URL` pulls the org layer on every search run; `STARLOG_PRIVATE_CORPUS` still wins on id collision for machine/project overlays. A bad or offline URL never breaks keyless search — the org layer is skipped and ranking continues. Generation (`org sync`, `corpus add`) is unchanged; v1 is read-only (no `starlog org publish`).
+
 ## How it works
 
 Starlog vets a package as **three independent layers, composed at query time** — never collapsed into one blurry "score":
