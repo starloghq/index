@@ -13,7 +13,7 @@ const RUNTIME_EXTERNAL = [
 ];
 
 await build({
-  entryPoints: ['src/cli.ts', 'src/mcp.ts'],
+  entryPoints: ['src/cli.ts', 'src/mcp.ts', 'src/hook-runner.ts'],
   bundle: true,
   platform: 'node',
   format: 'esm',
@@ -23,4 +23,4 @@ await build({
   external: RUNTIME_EXTERNAL,
 });
 
-console.log('Built dist/cli.js and dist/mcp.js');
+console.log('Built dist/cli.js, dist/mcp.js, and dist/hook-runner.js');

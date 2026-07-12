@@ -191,6 +191,24 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
     }
   });
 
+  // 2c. HOOK SHIM — a shim hook (loads dist/hook-runner.js) reports "Hook logic"
+  //     resolving against the built runner, proving upgrades refresh behaviour
+  //     without a re-init. The runner ships in dist/, so it resolves.
+  it('reports Hook logic resolving when the installed hook is the runtime-shim form', () => {
+    const { home, cwd } = freshDirs();
+    const hooksDir = join(home, '.claude', 'hooks');
+    mkdirSync(hooksDir, { recursive: true });
+    // Minimal valid-JS stand-in carrying the shim marker doctor keys on.
+    writeFileSync(join(hooksDir, 'starlog-pkg-check.js'), '// loads dist/hook-runner.js\nprocess.exit(0)\n', 'utf8');
+    writeSettings(home, {
+      mcpServers: {},
+      hooks: { PostToolUse: [{ matcher: '', hooks: [{ type: 'command', command: 'node ' + join(hooksDir, 'starlog-pkg-check.js') }] }] },
+    });
+    const { stdout } = runDoctor(cwd, home);
+    expect(stdout).toContain('Hook logic');
+    expect(stdout).toContain('resolves');
+  });
+
   // 3. CORRUPT settings.json — flagged as invalid, NOT mistaken for "not configured".
   // Malformed bytes ('{ broken json ') must surface a '[x]  settings.json — invalid JSON ('
   // problem with 'fix or remove' + 'starlog init' guidance, exit 1. Crucially, doctor

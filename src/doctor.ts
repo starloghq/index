@@ -5,6 +5,7 @@ import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { loadCorpus } from './engine/corpus.js';
+import { getPackageRoot } from './paths.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -198,6 +199,21 @@ async function checkHook(settings: Record<string, unknown> | null): Promise<Chec
     } catch (err) {
       const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
       checks.push({ level: 'fail', label: 'PostToolUse hook', detail: `script has a syntax error (${msg})` });
+    }
+
+    // The installed hook is a thin shim that loads the package's dist/hook-runner.js
+    // at runtime (so upgrades refresh behaviour with no re-init). Verify that logic
+    // module is actually resolvable — a broken upgrade would otherwise silently stop
+    // surfacing facts. Only meaningful for the shim; a legacy self-contained hook has
+    // no such dependency, so we skip the check when the marker is absent.
+    const runnerPath = join(getPackageRoot(), 'dist', 'hook-runner.js');
+    const isShim = await readFile(HOOK_PATH, 'utf8').then((c) => c.includes('hook-runner.js')).catch(() => false);
+    if (isShim) {
+      checks.push(
+        (await fileExists(runnerPath))
+          ? { level: 'ok', label: 'Hook logic', detail: 'hook-runner.js resolves — upgrades refresh behaviour with no re-init' }
+          : { level: 'fail', label: 'Hook logic', detail: `shim cannot load its logic (${runnerPath} missing) — re-run \`starlog init\`` },
+      );
     }
   } else {
     checks.push({ level: 'fail', label: 'PostToolUse hook', detail: 'registered in settings but script file is missing' });

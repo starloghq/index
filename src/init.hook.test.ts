@@ -10,6 +10,10 @@ const hookPath = join(mkdtempSync(join(tmpdir(), 'starlog-hook-')), 'hook.js');
 beforeAll(() => {
   // l2-facts.json must exist (build/gen step); regenerate to be safe.
   execFileSync('npx', ['tsx', 'scripts/gen-l2-facts.ts'], { stdio: 'inherit' });
+  // The installed hook is now a thin shim that dynamically imports the package's
+  // dist/hook-runner.js (so upgrades refresh behaviour without re-init) — build it
+  // so the shim resolves against real, current logic.
+  execFileSync('node', ['build.mjs'], { stdio: 'inherit' });
   writeFileSync(hookPath, generateHookScript());
 });
 
