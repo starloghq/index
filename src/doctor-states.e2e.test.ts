@@ -1,9 +1,12 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { createServer, type Server } from 'node:http';
+import { once } from 'node:events';
+import { AddressInfo } from 'node:net';
 
 /**
  * End-to-end tests for `starlog doctor` across un-wired / corrupt / half-migrated
@@ -66,6 +69,7 @@ function runDoctor(cwd: string, home: string): RunResult {
   env.STARLOG_TELEMETRY = '0';
   env.DO_NOT_TRACK = '1';
   env.CI = '1';
+  env.STARLOG_NO_UPDATE_CHECK = '1'; // keep the version check off the network in these state tests
   env.HOME = home; // applied LAST so it wins over the inherited value
   const r = spawnSync('node', [CLI, 'doctor'], { cwd, encoding: 'utf8', env });
   return { status: r.status ?? -1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
@@ -231,6 +235,46 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
     expect(stdout).toContain('starlog init');
     // The [ok] script line still prints — the warning is additive, not a replacement.
     expect(stdout).toContain('script present and valid');
+  });
+
+  // 2e. VERSION STALENESS — doctor nudges when the registry advertises a newer
+  //     starloghq than the installed one. A local HTTP stand-in (STARLOG_REGISTRY_URL)
+  //     keeps it hermetic; the check is best-effort so it never fails the run.
+  it('nudges to upgrade when the registry has a newer version', async () => {
+    const server: Server = createServer((req, res) => {
+      if (req.url === '/starloghq/latest') {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ version: '99.0.0' }));
+      } else {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
+    server.listen(0);
+    await once(server, 'listening');
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const { home, cwd } = freshDirs();
+      const env: Record<string, string | undefined> = { ...process.env };
+      delete env.STARLOG_NO_UPDATE_CHECK; // enable the check for this scenario
+      env.STARLOG_REGISTRY_URL = `http://127.0.0.1:${port}`;
+      env.STARLOG_TELEMETRY = '0';
+      env.DO_NOT_TRACK = '1';
+      env.CI = '1';
+      env.HOME = home;
+      // Async spawn (not spawnSync): the registry stand-in runs in THIS process's
+      // event loop, so a synchronous spawn would block it and the child's fetch
+      // would never be served (it would time out to null). spawn keeps the loop free.
+      const child = spawn('node', [CLI, 'doctor'], { cwd, env });
+      let stdout = '';
+      child.stdout.on('data', (d) => (stdout += d.toString()));
+      const [code] = (await once(child, 'close')) as [number];
+      expect(stdout).toContain('99.0.0 available');
+      expect(stdout).toContain('npm install -g starloghq@latest');
+      expect(code).toBe(0); // staleness is advisory (warn), never a failure
+    } finally {
+      server.close();
+    }
   });
 
   // 3. CORRUPT settings.json — flagged as invalid, NOT mistaken for "not configured".

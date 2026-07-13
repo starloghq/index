@@ -5,7 +5,8 @@ import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { loadCorpus } from './engine/corpus.js';
-import { getPackageRoot } from './paths.js';
+import { getPackageRoot, getPackageVersion } from './paths.js';
+import { compareVersions, fetchLatestVersion, updateCheckDisabled } from './update-check.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -291,6 +292,32 @@ async function checkRanker(settings: Record<string, unknown> | null): Promise<Ch
   return { level: 'ok', label: 'Ranking', detail: rankingState(settings).detail };
 }
 
+// ── Version staleness (best-effort) ──────────────────────────────────────────
+//
+// A stale install of a security tool is a liability, so doctor nudges when a
+// newer `starloghq` is published. Best-effort by design: skipped on opt-out,
+// and any network failure returns null (no check line) rather than a red mark —
+// a diagnostic must never hang or fail because npm was unreachable.
+async function checkForUpdate(): Promise<Check | null> {
+  if (updateCheckDisabled()) return null;
+  let current: string;
+  try {
+    current = getPackageVersion();
+  } catch {
+    return null;
+  }
+  const latest = await fetchLatestVersion();
+  if (!latest) return null; // offline / opt-out / bad response — stay silent
+  if (compareVersions(latest, current) > 0) {
+    return {
+      level: 'warn',
+      label: 'Version',
+      detail: `${latest} available (you have ${current}) — upgrade with \`npm install -g starloghq@latest\``,
+    };
+  }
+  return { level: 'ok', label: 'Version', detail: `up to date (${current})` };
+}
+
 // ── Private overlays (vetting + discovery + policy) ──────────────────────────
 //
 // Two distinct things, both invisible without this check:
@@ -364,6 +391,8 @@ export async function runDoctor(): Promise<number> {
   checks.push(...(await checkPrivateOverlays(settings, projectDir)));
   checks.push(...(await checkProjectAgents(projectDir)));
   checks.push(await checkRanker(settings));
+  const update = await checkForUpdate();
+  if (update) checks.push(update);
 
   for (const c of checks) print(c);
 

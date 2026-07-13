@@ -38,6 +38,7 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/starlog-smoke.XXXXXX")"
 export HOME="$WORK/home"
 export npm_config_prefix="$WORK/npm-global"
 export npm_config_userconfig="$WORK/.npmrc"   # ignore any real ~/.npmrc (and its tokens)
+export STARLOG_NO_UPDATE_CHECK=1              # keep doctor's version check off the network in the gate
 mkdir -p "$HOME" "$npm_config_prefix"
 : > "$npm_config_userconfig"
 export PATH="$npm_config_prefix/bin:$PATH"
