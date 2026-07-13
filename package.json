@@ -46,8 +46,10 @@
     "bench:facts": "tsx scripts/bench-facts.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "check:versions": "node scripts/check-versions.mjs",
     "smoke": "bash scripts/smoke-test.sh",
-    "verify:release": "bash scripts/verify-release.sh"
+    "verify:release": "bash scripts/verify-release.sh",
+    "version": "node scripts/sync-server-version.mjs && git add server.json"
   },
   "engines": {
     "node": ">=20"
