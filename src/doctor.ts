@@ -396,6 +396,12 @@ export async function checkPrivateOverlays(settings: Record<string, unknown> | n
     });
   } else if (patternsRes.kind === 'invalid') {
     checks.push({ level: 'warn', label: 'Pattern store', detail: 'patterns.json is invalid JSON — fix or remove' });
+  } else {
+    checks.push({
+      level: 'warn',
+      label: 'Pattern store',
+      detail: 'none yet — run `starlog patterns scan` to track DIY patterns',
+    });
   }
 
   return checks;

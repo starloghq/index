@@ -99,6 +99,13 @@ describe('checkPrivateOverlays() — wiring + per-project authoring visibility',
     expect(byLabel(checks, 'Private discovery')?.level).toBe('warn');
   });
 
+  it('nudges toward pattern scan when patterns.json is missing', async () => {
+    const checks = await checkPrivateOverlays(WIRED, tmpRoot);
+    const p = byLabel(checks, 'Pattern store');
+    expect(p?.level).toBe('warn');
+    expect(p?.detail).toContain('patterns scan');
+  });
+
   it('warns when a wired overlay path resolves OUTSIDE this project (misrouted / cross-project leak — issue #58)', async () => {
     // The server resolves ${CLAUDE_PROJECT_DIR} to THIS project root at runtime, so a
     // stale absolute path baked into the env (or a cross-project leak) means the agent
