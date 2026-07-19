@@ -439,5 +439,32 @@
     "license_risk": "none",
     "maintenance": "active",
     "fetched_at": "2026-06-04"
+  },
+  "@clerk/nextjs": {
+    "package": "@clerk/nextjs",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-01"
+  },
+  "@auth0/nextjs-auth0": {
+    "package": "@auth0/nextjs-auth0",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-01"
+  },
+  "@supabase/supabase-js": {
+    "package": "@supabase/supabase-js",
+    "ecosystem": "npm",
+    "known_vulns": [],
+    "license": "MIT",
+    "license_risk": "none",
+    "maintenance": "active",
+    "fetched_at": "2026-06-01"
   }
 }

@@ -198,6 +198,7 @@ describe('facts-first onboarding text (D-01/D-02/D-04)', () => {
 
     // The instruction injected into every harness leads with starlog_facts.
     expect(written).toContain('starlog_facts');
+    expect(written).toContain('starlog_advise');
     expect(written).toContain('vet packages before you use them'); // facts-first header
     expect(written).toContain('vet it with');                      // stable body substring
 

@@ -2,6 +2,16 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## 0.9.0 (unreleased)
+
+Pattern tracking and migrate-or-packageize advisories — track DIY capability code, prefer migrating to safe corpus libraries over repeating dangerous DIY, and packageize only when no safe alternative exists.
+
+- **feat(mcp): `starlog_advise` tool** — scans for DIY patterns or accepts an observation, searches the corpus, applies a facts-based safety gate, and returns **MIGRATE** (when Clerk/Auth0/Supabase-class alternatives exist), **PACKAGEIZE** (niche with no safe hit), or **WATCH** (below recurrence threshold).
+- **feat(cli): `starlog advise`, `starlog patterns scan|list`, `starlog advise packageize`** — CLI parity with bundled playbooks and private corpus/facts scaffolding for packageize paths.
+- **feat(patterns): project + global `.starlog/patterns.json` store** — heuristic scanners for the 7 indexed categories; recurrence threshold before advising action.
+- **feat(corpus): Supabase Auth manifest** + L2 facts for `@clerk/nextjs`, `@auth0/nextjs-auth0`, `@supabase/supabase-js`.
+- **feat(doctor): pattern store check** + MCP handshake expects `starlog_advise`.
+
 ## 0.8.0
 
 Per-project private overlays now work end-to-end — the root-cause fix that made the MCP server's `${CLAUDE_PROJECT_DIR}` wiring silently no-op, plus CLI parity so `search`/`facts` see the same private `.starlog/` the agent does.

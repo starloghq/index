@@ -3,6 +3,11 @@ import { Command } from 'commander';
 import { formatTable, formatJSON } from './engine/format.js';
 import { KnownCategorySchema } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
+import { runAdvise } from './advise-service.js';
+import { formatAdviseMarkdown, formatAdviseJson } from './engine/advise-format.js';
+import { scanProject } from './patterns/detect.js';
+import { listPatterns, upsertPattern } from './patterns/store.js';
+import { scaffoldPackageize } from './patterns/packageize.js';
 import { overlayPath } from './engine/overlay-discovery.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
@@ -628,6 +633,124 @@ corpus
           console.log(`Try it: STARLOG_PRIVATE_CORPUS=${path} starlog search "<the capability>"`);
         }
         console.log(`Tip: also vet it — starlog facts add ${pkg} --status active --license ${opts.license ?? '<spdx>'}`);
+      },
+    ),
+  );
+
+// ── patterns: track DIY capability patterns ─────────────────────────────────
+
+const patterns = program
+  .command('patterns')
+  .description('Track repeated DIY capability patterns across projects');
+
+patterns
+  .command('scan [dir]')
+  .description('Scan a project for DIY patterns and upsert into .starlog/patterns.json')
+  .action(
+    action('patterns scan failed', async (dir: string | undefined) => {
+      const root = dir ?? process.cwd();
+      const hits = await scanProject(root);
+      if (hits.length === 0) {
+        console.log(`No DIY patterns detected under ${root}.`);
+        return;
+      }
+      for (const hit of hits) {
+        const record = await upsertPattern({
+          category: hit.category,
+          signals: hit.signals,
+          projectDir: root,
+        });
+        console.log(`[${hit.category}] confidence ${hit.confidence} → ${record.id} (${record.occurrences} occurrence(s))`);
+      }
+      await track('cli_patterns_scan', { hits: hits.length }, { noTelemetry: noTelemetry() });
+    }),
+  );
+
+patterns
+  .command('list')
+  .description('List tracked patterns (project + global merge)')
+  .option('--dir <path>', 'Project directory for local patterns', process.cwd())
+  .option('--format <type>', 'json or table', 'table')
+  .action(
+    action('patterns list failed', async (opts: { dir: string; format: string }) => {
+      const items = await listPatterns(opts.dir);
+      if (opts.format === 'json') {
+        console.log(JSON.stringify(items, null, 2));
+        return;
+      }
+      if (items.length === 0) {
+        console.log('No patterns tracked yet. Run `starlog patterns scan`.');
+        return;
+      }
+      for (const p of items) {
+        console.log(`${p.id}  ${p.category}  ${p.status}  ${p.occurrences}x  last ${p.last_seen.slice(0, 10)}`);
+      }
+    }),
+  );
+
+// ── advise: migrate-or-packageize decision ──────────────────────────────────
+
+const advise = program
+  .command('advise')
+  .description('Advise MIGRATE to a safe library or PACKAGEIZE when no safe alternative exists');
+
+advise
+  .argument('[observation]', 'What you observed, e.g. "DIY JWT auth"')
+  .option('--dir <path>', 'Project root to scan', process.cwd())
+  .option('--category <cat>', 'Capability category filter')
+  .option('--force', 'Advise even when recurrence is below threshold')
+  .option('--context <desc>', 'Project context for search ranking')
+  .option('--format <type>', 'json or markdown', 'markdown')
+  .action(
+    action(
+      'advise failed',
+      async (observation: string | undefined, opts: { dir: string; category?: string; force?: boolean; context?: string; format: string }) => {
+        if (opts.format !== 'json' && opts.format !== 'markdown') {
+          console.error(`Invalid format: ${opts.format}. Use "json" or "markdown".`);
+          process.exit(1);
+        }
+        const result = await runAdvise({
+          observation,
+          project_root: opts.dir,
+          category: opts.category,
+          force: opts.force,
+          context: opts.context,
+          privateCorpusPath: overlayPath(process.env.STARLOG_PRIVATE_CORPUS, 'private-corpus.json', opts.dir),
+        });
+        await track(
+          'cli_advise',
+          { action: result.action, category: result.category, force: !!opts.force },
+          { noTelemetry: noTelemetry() },
+        );
+        const output = opts.format === 'json' ? formatAdviseJson(result) : formatAdviseMarkdown(result);
+        console.log(output);
+        await nudgeInitIfUnwired(opts.format === 'json' ? 'json' : 'table');
+      },
+    ),
+  );
+
+advise
+  .command('packageize')
+  .description('Scaffold private corpus + facts for a packageize recommendation')
+  .requiredOption('--from-pattern <id>', 'Pattern id from starlog patterns list')
+  .requiredOption('--name <pkg>', 'New internal package name, e.g. @acme/session-core')
+  .option('--solves <text>', 'One-line capability description for discovery')
+  .option('--dir <path>', 'Project directory', process.cwd())
+  .action(
+    action(
+      'advise packageize failed',
+      async (opts: { fromPattern: string; name: string; solves?: string; dir: string }) => {
+        const { factsPath, corpusPath } = await scaffoldPackageize({
+          patternId: opts.fromPattern,
+          packageName: opts.name,
+          solves: opts.solves,
+          projectDir: opts.dir,
+        });
+        await track('cli_advise_packageize', { package: opts.name }, { noTelemetry: noTelemetry() });
+        console.log(`Scaffolded ${opts.name}:`);
+        console.log(`  facts → ${factsPath}`);
+        console.log(`  corpus → ${corpusPath}`);
+        console.log('Your agent can now discover and vet this internal package.');
       },
     ),
   );

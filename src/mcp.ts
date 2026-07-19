@@ -6,6 +6,8 @@ import { z } from 'zod/v4';
 import { KnownCategorySchema } from './manifest/schema.js';
 import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
+import { runAdvise } from './advise-service.js';
+import { formatAdviseMarkdown } from './engine/advise-format.js';
 import { buildComposeDeps, resolveFactView, createFactsApiClient, formatFactView } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
 import { track, pendingMcpDisclosure } from './telemetry.js';
@@ -68,6 +70,9 @@ function formatResults(query: string, results: QueryResult[]): string {
 export const FACTS_TOOL_DESCRIPTION =
   'Look up authoritative facts about a software package: known vulnerabilities/CVEs and supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and what the package can do (effect surface). Use it to vet a package before recommending it.';
 
+export const ADVISE_TOOL_DESCRIPTION =
+  'When you detect DIY or repeated capability code (auth, caching, jobs, etc.), call this BEFORE building more custom code or extracting a reusable package. It tracks patterns, searches for safe alternatives, and advises MIGRATE to a known library when one exists (e.g. Clerk/Auth0/Supabase over DIY auth) or PACKAGEIZE only when no safe corpus alternative exists. Prefer migration over packageizing commodity capabilities.';
+
 // Rendering of a composed FactView lives in engine/facts/format.ts
 // (formatFactView) — shared by the MCP tool and the CLI.
 
@@ -122,6 +127,37 @@ export function createServer(): McpServer {
       const disclosure = pendingMcpDisclosure();
       if (!disclosure) void track('mcp_facts', mcpFactsEventProps(args, view, { usedApi: factsApi !== null, privatePackages: factsLocal.privatePackages }), { surface: 'mcp' });
       const text = formatFactView(args.package, view) + (disclosure ? `\n\n${disclosure}` : '');
+      return { content: [{ type: 'text' as const, text }] };
+    },
+  );
+
+  server.tool(
+    'starlog_advise',
+    ADVISE_TOOL_DESCRIPTION,
+    {
+      observation: z
+        .string()
+        .optional()
+        .describe('What you observed, e.g. "hand-rolled JWT auth" or "third project with custom session middleware"'),
+      project_root: z.string().optional().describe('Absolute path to scan for DIY patterns (defaults to cwd)'),
+      category: z
+        .string()
+        .optional()
+        .describe(`Capability category filter. Known: ${KnownCategorySchema.options.join(', ')}`),
+      force: z.boolean().optional().describe('Advise migration/packageize even when recurrence is below threshold'),
+      context: z.string().optional().describe('Project context for search ranking, e.g. "Next.js B2B SaaS"'),
+    },
+    async (args) => {
+      const result = await runAdvise({
+        observation: args.observation,
+        project_root: args.project_root,
+        category: args.category,
+        force: args.force,
+        context: args.context,
+      });
+      const disclosure = pendingMcpDisclosure();
+      if (!disclosure) void track('mcp_advise', { action: result.action, category: result.category }, { surface: 'mcp' });
+      const text = formatAdviseMarkdown(result) + (disclosure ? `\n\n${disclosure}` : '');
       return { content: [{ type: 'text' as const, text }] };
     },
   );

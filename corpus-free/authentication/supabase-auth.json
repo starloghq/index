@@ -1,0 +1,58 @@
+{
+  "id": "supabase-auth",
+  "name": "Supabase Auth",
+  "repo": "supabase/supabase-js",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides email/password, magic link, OAuth, and phone authentication backed by Supabase's managed Auth service, with session handling via JWT and optional Row Level Security integration for Postgres.",
+  "stack_affinity": [
+    "next.js",
+    "react",
+    "remix",
+    "svelte",
+    "vue",
+    "nuxt",
+    "expo",
+    "node",
+    "postgres"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Apps already using Supabase Postgres that want auth and database in one platform",
+    "Projects needing email/password and social OAuth without running auth infrastructure",
+    "Teams comfortable with Supabase's hosted auth and RLS for authorization",
+    "Full-stack JS apps that want JWT sessions with a managed identity backend",
+    "Startups shipping quickly with a generous free tier for auth + database"
+  ],
+  "skip_when": [
+    "You need a fully self-hosted auth stack with no vendor dependency",
+    "Your backend is not JavaScript/TypeScript and cannot use the Supabase client",
+    "You require enterprise SSO/SAML with complex org hierarchies out of the box",
+    "You are not using Postgres or willing to adopt Supabase as your backend",
+    "You need polished pre-built auth UI components like Clerk provides"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "clerk",
+    "auth0",
+    "nextauth",
+    "lucia",
+    "firebase-auth",
+    "custom-authentication",
+    "passport"
+  ],
+  "health": {
+    "stars": 38000,
+    "weekly_downloads": 3500000,
+    "last_commit": "2026-05-20T12:00:00Z",
+    "contributors": 500,
+    "license": "MIT",
+    "open_issues": 200
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

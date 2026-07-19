@@ -31,7 +31,7 @@ describe('L1 corpus (capability facts)', () => {
 describe('L2 corpus (overlay)', () => {
   it('is the curated overlay set, no duplicates, and covers every L1 corpus package', () => {
     expect(new Set(L2_OVERLAYS_LIST.map((o) => o.package)).size).toBe(L2_OVERLAYS_LIST.length);
-    expect(L2_OVERLAYS_LIST.length).toBe(42); // 11 hand-authored + sourced (Phase 12 eval-driven curation)
+    expect(L2_OVERLAYS_LIST.length).toBe(45); // hand-authored + sourced (incl. auth migration targets)
     for (const p of CORPUS) expect(L2_BY_PACKAGE[p]).toBeDefined(); // L2 is a superset of the L1 corpus
   });
 

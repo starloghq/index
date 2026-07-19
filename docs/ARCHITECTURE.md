@@ -21,7 +21,7 @@ flowchart TB
     agent["AI coding agent / developer"]
 
     subgraph surfaces["Surfaces — identical behavior, shared engine"]
-        mcp["MCP server<br/>starlog_facts · starlog_search"]
+        mcp["MCP server<br/>starlog_facts · starlog_search · starlog_advise"]
         cli["CLI<br/>facts · search · init · org sync · …"]
         hook["install hook<br/>(PostToolUse: vet on install)"]
     end
@@ -106,6 +106,24 @@ flowchart LR
     bundled --> merge
     merge --> rank["local keyword ranker<br/>absolute scores → 'no strong match' when thin"]
     rank --> results["ranked QueryResults → agent"]
+```
+
+## Advise — pattern track → migrate or packageize
+
+`starlog_advise` orchestrates search + facts for DIY/repeated capability code. It
+scans the project (or accepts an observation), upserts `.starlog/patterns.json`,
+searches the corpus, and applies a safety gate (relevance, maintenance, L3 deny,
+known vulns). **Migrate wins** when any safe package exists; **packageize** only
+when none do.
+
+```mermaid
+flowchart LR
+  a["starlog_advise"] --> scan["pattern scan / observation"]
+  scan --> store[".starlog/patterns.json"]
+  scan --> search["starlog_search candidates"]
+  search --> gate["starlog_facts safety gate"]
+  gate --> migrate["MIGRATE + playbook"]
+  gate --> packageize["PACKAGEIZE + scaffold"]
 ```
 
 ## Telemetry & consent

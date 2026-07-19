@@ -165,8 +165,10 @@ async function checkMcp(settings: Record<string, unknown> | null): Promise<Check
 
   try {
     const tools = await mcpHandshake(configured);
-    if (tools.includes('starlog_search')) {
-      checks.push({ level: 'ok', label: 'MCP handshake', detail: `starlog_search available` });
+    if (tools.includes('starlog_search') && tools.includes('starlog_advise')) {
+      checks.push({ level: 'ok', label: 'MCP handshake', detail: `starlog_search + starlog_advise available` });
+    } else if (tools.includes('starlog_search')) {
+      checks.push({ level: 'warn', label: 'MCP handshake', detail: `starlog_search available but starlog_advise missing (tools: ${tools.join(', ')})` });
     } else {
       checks.push({ level: 'fail', label: 'MCP handshake', detail: `server responded but starlog_search missing (tools: ${tools.join(', ') || 'none'})` });
     }
@@ -382,6 +384,20 @@ export async function checkPrivateOverlays(settings: Record<string, unknown> | n
       ? { level: 'ok', label: 'Private overlays (this project)', detail: found.join(', ') }
       : { level: 'warn', label: 'Private overlays (this project)', detail: 'none yet — `starlog corpus add <pkg> --solves "…"` (discovery), `starlog facts add` (vetting)' },
   );
+
+  const patternsRes = await readJson(join(projectDir, '.starlog', 'patterns.json'));
+  if (patternsRes.kind === 'ok') {
+    const arr = (patternsRes.data as { patterns?: unknown[] }).patterns;
+    const count = Array.isArray(arr) ? arr.length : 0;
+    checks.push({
+      level: count > 0 ? 'ok' : 'warn',
+      label: 'Pattern store',
+      detail: count > 0 ? `${count} tracked pattern(s) in .starlog/patterns.json` : 'empty — run `starlog patterns scan` to track DIY patterns',
+    });
+  } else if (patternsRes.kind === 'invalid') {
+    checks.push({ level: 'warn', label: 'Pattern store', detail: 'patterns.json is invalid JSON — fix or remove' });
+  }
+
   return checks;
 }
 

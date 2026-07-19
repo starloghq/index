@@ -48,10 +48,11 @@ You can't fix recall by prompting harder. **Starlog puts authoritative, dated fa
 - **`starlog_facts` MCP tool** — your agent looks up **authoritative facts about a specific package** before recommending it: known CVEs/supply-chain incidents, SPDX license and license risk, maintenance status (active/deprecated/abandoned/compromised), and effect surface. In a 4-model benchmark, agents called this tool unprompted on package decisions (100% recall, 98% specificity) and it moved them toward the correct install/avoid/pick call. Every record is sourced, verified, and **dated** — each result shows an "as of `<date>`" line so a stale "no known vulns" is never mistaken for a fresh one. A package with no record returns an honest "no facts on file." Facts are three independent layers, composed at query time: **L1** capability/effect-surface (immutable), **L2** reputation/vuln/license/maintenance (mutable — carries the `as of` recency), **L3** org policy (your suitability verdict). Override or extend any layer locally: point `STARLOG_PRIVATE_FACTS` at a JSON file with independent `l1`/`l2` arrays (internal packages, license rulings) and `STARLOG_POLICY` at an org policy (`{ org, rules }`) for allow/deny/flag verdicts. With `STARLOG_API_KEY` set, org-private overlays and policy come from the hosted facts API (local corpus is the offline fallback); `starlog facts push` uploads your org's overlays + policy. See [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
 - **Package-install hook** — fires the moment your agent runs `npm install` / `pnpm add` / `yarn add` / `pip install` and **surfaces that package's facts** (known incidents, license, maintenance) *before* the agent builds on it. Advisory — it informs the next move, it doesn't block the install. Packages with no record are queued for coverage.
 - **`starlog_search` MCP tool** — discovery: find candidate packages for a capability (org-sanctioned options first), then vet the named pick with `starlog_facts`. Discovery surfaces what exists; facts vet it.
-- **`starlog facts` / `starlog search` CLI** — the same facts and discovery from your terminal.
+- **`starlog_advise` MCP tool** — when your agent sees DIY or repeated capability code, advises **MIGRATE** to a safe library (e.g. Clerk/Auth0/Supabase over DIY auth) or **PACKAGEIZE** only when no safe corpus alternative exists. Tracks patterns in `.starlog/patterns.json`.
+- **`starlog facts` / `starlog search` / `starlog advise` / `starlog patterns` CLI** — the same facts, discovery, and migrate-or-packageize advisories from your terminal.
 - **Runs on your machine** — the engine and corpus are local; the default (keyless) path needs no account, no API key, and no network. Setting `STARLOG_API_KEY` opts into the hosted facts/search tiers (with local fallback) — get a key at [starlog.dev](https://starlog.dev) and wire it with `starlog init --api-key <key>`; anonymous, opt-out usage telemetry is the only thing sent otherwise — see [Telemetry](#telemetry).
 
-This repo ships the engine plus a curated **facts corpus of 42 packages** and a discovery corpus of **25 capability manifests across 7 categories**.
+This repo ships the engine plus a curated **facts corpus** and a discovery corpus of **26 capability manifests across 7 categories** (including authentication playbooks for migration).
 
 ## Quick start
 
@@ -61,7 +62,7 @@ npx starloghq init
 
 This wires Starlog into Claude Code (and drops instruction files for Cursor, Copilot, Codex):
 
-- **MCP server** added to `~/.claude/settings.json` — exposes `starlog_facts` (vet a package by name) and `starlog_search` (discover candidates), and wires your **per-project private overlays** (`${CLAUDE_PROJECT_DIR}/.starlog/*`) into the agent so internal-package facts + discovery work automatically in each project
+- **MCP server** added to `~/.claude/settings.json` — exposes `starlog_facts` (vet a package by name), `starlog_search` (discover candidates), and `starlog_advise` (migrate-or-packageize for DIY patterns), and wires your **per-project private overlays** (`${CLAUDE_PROJECT_DIR}/.starlog/*`) into the agent so internal-package facts + discovery work automatically in each project
 - **PostToolUse hook** installed — surfaces a package's facts on install
 - Previews every change and asks before writing; **idempotent** and safe to re-run
 

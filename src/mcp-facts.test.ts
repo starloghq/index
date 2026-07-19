@@ -37,12 +37,13 @@ describe('starlog MCP server — facts tool', () => {
     expect(FACTS_TOOL_DESCRIPTION).toBe(VERBATIM_WILLINGNESS_DESCRIPTION);
   });
 
-  it('registers BOTH starlog_search and starlog_facts', async () => {
+  it('registers starlog_search, starlog_facts, and starlog_advise', async () => {
     const client = await connectClient();
     const { tools } = await client.listTools();
     const names = tools.map((t) => t.name);
     expect(names).toContain('starlog_search');
     expect(names).toContain('starlog_facts');
+    expect(names).toContain('starlog_advise');
     await client.close();
   });
 

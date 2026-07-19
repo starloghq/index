@@ -478,6 +478,36 @@ export const L2_OVERLAYS_LIST: L2Overlay[] = [
     transitive_risk: null,
     attestation: { source: 'osv', refs: ['https://deps.dev/npm/puppeteer/25.1.0', 'https://osv.dev/vulnerability/MAL-2026-5077'], fetched_at: '2026-06-04' },
   },
+  {
+    package: '@clerk/nextjs',
+    ecosystem: 'npm',
+    known_vulns: [],
+    license: 'MIT',
+    license_risk: 'none',
+    maintenance: 'active',
+    transitive_risk: null,
+    attestation: { source: 'hand', refs: ['https://www.npmjs.com/package/@clerk/nextjs'], fetched_at: FETCHED },
+  },
+  {
+    package: '@auth0/nextjs-auth0',
+    ecosystem: 'npm',
+    known_vulns: [],
+    license: 'MIT',
+    license_risk: 'none',
+    maintenance: 'active',
+    transitive_risk: null,
+    attestation: { source: 'hand', refs: ['https://www.npmjs.com/package/@auth0/nextjs-auth0'], fetched_at: FETCHED },
+  },
+  {
+    package: '@supabase/supabase-js',
+    ecosystem: 'npm',
+    known_vulns: [],
+    license: 'MIT',
+    license_risk: 'none',
+    maintenance: 'active',
+    transitive_risk: null,
+    attestation: { source: 'hand', refs: ['https://www.npmjs.com/package/@supabase/supabase-js'], fetched_at: FETCHED },
+  },
 ];
 
 /** package -> L2 overlay. */

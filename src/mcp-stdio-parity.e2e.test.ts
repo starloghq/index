@@ -197,7 +197,7 @@ describe('MCP stdio: handshake + tools/list + CLI facts parity', () => {
       // tools/list: exactly two tools with stable names and required arg schemas.
       const { tools } = await client.listTools();
       const byName = Object.fromEntries(tools.map((t) => [t.name, t]));
-      expect(Object.keys(byName).sort()).toEqual(['starlog_facts', 'starlog_search']);
+      expect(Object.keys(byName).sort()).toEqual(['starlog_advise', 'starlog_facts', 'starlog_search']);
       expect(byName.starlog_search.inputSchema?.required).toEqual(['query']);
       expect(byName.starlog_facts.inputSchema?.required).toEqual(['package']);
 
