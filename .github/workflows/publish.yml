@@ -31,6 +31,13 @@ jobs:
       - name: Ensure npm >= 11.5.1 (trusted publishing)
         run: npm install -g npm@latest
 
+      # Fail fast, before the expensive build/test, if the tag and the manifests
+      # disagree. On a tag push GitHub sets GITHUB_REF_TYPE=tag / GITHUB_REF_NAME=vX.Y.Z,
+      # so this asserts package.json AND server.json both equal the tag — closing the
+      # server.json gap the old package.json-only tag check left open. No deps (node builtins).
+      - name: Check version consistency (manifests match the tag)
+        run: npm run check:versions
+
       - name: Install dependencies
         run: npm ci
 
@@ -53,11 +60,6 @@ jobs:
 
       - name: Smoke-test the packed tarball
         run: STARLOG_TARBALL="$GITHUB_WORKSPACE/$TARBALL" STARLOG_EXPECT_VERSION="$PKG_VERSION" bash scripts/smoke-test.sh
-
-      - name: Verify tag matches package.json version
-        run: |
-          TAG="${GITHUB_REF_NAME#v}"
-          [ "$TAG" = "$PKG_VERSION" ] || { echo "::error::tag ${GITHUB_REF_NAME} does not match package.json version ${PKG_VERSION}"; exit 1; }
 
       - name: Publish to npm (OIDC, with provenance)
         # Blank the dummy token that actions/setup-node writes into .npmrc

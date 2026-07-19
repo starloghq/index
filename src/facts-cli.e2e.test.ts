@@ -380,20 +380,20 @@ describe('starlog facts authoring (add / policy) e2e', () => {
     // relative default resolves under tmpDir.
     const add = runFactsInDir(dir, ['add', '@acme/unset', '--license', 'MIT', '--status', 'active']);
     expect(add.status).toBe(0);
-    // Nudge is accurate about the agent path: the agent auto-reads the default
-    // .starlog file after `starlog init` (the MCP server's baked env), and the
-    // inline-env form is for CLI use in this shell. A shell `export` never reaches
-    // the agent-spawned server, so we no longer tell users to do that.
+    // Nudge advertises auto-discovery: the agent auto-reads the default .starlog file
+    // after `starlog init` (the MCP server's baked env), and the CLI now auto-reads it
+    // from the project too — no shell export needed (issue #59).
     expect(add.stdout).toContain('starlog init');
-    expect(add.stdout).toContain('STARLOG_PRIVATE_FACTS=');
+    expect(add.stdout).toContain('Vet it from this project: starlog facts');
     expect(add.stdout).not.toContain('export STARLOG_PRIVATE_FACTS=');
 
     const defaultPath = join(dir, '.starlog', 'private-facts.json');
     const parsed = JSON.parse(readFileSync(defaultPath, 'utf8'));
     expect(parsed.l2[0].package).toBe('@acme/unset');
 
-    // Follow the nudge: set the absolute path the loader reads verbatim.
-    const vet = runFactsInDir(dir, ['@acme/unset'], { STARLOG_PRIVATE_FACTS: defaultPath });
+    // A BARE vet from the project (env UNSET) now auto-reads ./.starlog/ — parity with
+    // the agent, no STARLOG_PRIVATE_FACTS export needed.
+    const vet = runFactsInDir(dir, ['@acme/unset']);
     expect(vet.status).toBe(0);
     expect(vet.stdout).toContain('## @acme/unset (npm)');
     expect(vet.stdout).toContain('**License:** MIT');

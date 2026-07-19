@@ -167,6 +167,23 @@ describe('starlog search CLI (e2e, spawned binary) — local keyword search', ()
     expect(Array.isArray(JSON.parse(jsonRun.stdout))).toBe(true);
   });
 
+  // 3b. INVALID --top-k — a zero/negative/non-numeric value used to either
+  //     silently default (5) or return an empty set framed as a misleading
+  //     'No strong match'. It is now rejected loudly (feature audit BUG-3).
+  it('rejects a non-positive or non-numeric --top-k with a clear error (exit 1)', () => {
+    const dir = newTmpDir();
+    for (const bad of ['0', '-3', 'abc']) {
+      const r = runSearch(['email sending', '--top-k', bad], { cwd: dir });
+      expect(r.status).toBe(1);
+      expect(r.stderr).toContain(`Invalid --top-k "${bad}". Use a positive integer`);
+      expect(r.stderr).not.toContain('No strong match');
+    }
+    // A valid value still works.
+    const ok = runSearch(['email sending', '--top-k', '2'], { cwd: dir });
+    expect(ok.status).toBe(0);
+    expect(ok.stdout).toMatch(/^1\s/m);
+  });
+
   // 4. --format json on a no-match (jq-pipeline footgun). The no-match branch
   //    console.error()'s the guidance to STDERR and exits BEFORE any console.log,
   //    so stdout is EMPTY — `--format json | jq` crashes on every miss. We assert

@@ -98,6 +98,24 @@ describe('checkPrivateOverlays() — wiring + per-project authoring visibility',
     const checks = await checkPrivateOverlays(WIRED, tmpRoot);
     expect(byLabel(checks, 'Private discovery')?.level).toBe('warn');
   });
+
+  it('warns when a wired overlay path resolves OUTSIDE this project (misrouted / cross-project leak — issue #58)', async () => {
+    // The server resolves ${CLAUDE_PROJECT_DIR} to THIS project root at runtime, so a
+    // stale absolute path baked into the env (or a cross-project leak) means the agent
+    // reads a different location than this project's .starlog/. Presence of the env key
+    // is NOT enough — doctor must confirm it resolves to <projectDir>/.starlog/.
+    const misrouted = {
+      mcpServers: {
+        starlog: { command: 'node', args: ['/x/dist/mcp.js'], env: {
+          STARLOG_PRIVATE_FACTS: '${CLAUDE_PROJECT_DIR}/.starlog/private-facts.json',
+          STARLOG_PRIVATE_CORPUS: '/some/other/project/.starlog/private-corpus.json',
+        } },
+      },
+    };
+    const checks = await checkPrivateOverlays(misrouted, tmpRoot);
+    const w = byLabel(checks, 'Private overlays wired');
+    expect(w?.level).toBe('warn');
+  });
 });
 
 describe('checkOrgCorpus() — optional company-hosted discovery URL', () => {

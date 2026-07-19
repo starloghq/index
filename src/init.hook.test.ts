@@ -10,6 +10,10 @@ const hookPath = join(mkdtempSync(join(tmpdir(), 'starlog-hook-')), 'hook.js');
 beforeAll(() => {
   // l2-facts.json must exist (build/gen step); regenerate to be safe.
   execFileSync('npx', ['tsx', 'scripts/gen-l2-facts.ts'], { stdio: 'inherit' });
+  // The installed hook is now a thin shim that dynamically imports the package's
+  // dist/hook-runner.js (so upgrades refresh behaviour without re-init) — build it
+  // so the shim resolves against real, current logic.
+  execFileSync('node', ['build.mjs'], { stdio: 'inherit' });
   writeFileSync(hookPath, generateHookScript());
 });
 
@@ -93,5 +97,36 @@ describe('compound-command parsing (#29) — only real package names', () => {
     const msgs = runHookAll('npm install lodash@4.17.21');
     expect(msgs.length).toBe(1);
     expect(msgs.join(' ')).toContain('lodash');
+    // The version must be gone from the message — otherwise the facts lookup
+    // and the starlog_facts suggestion key on a name that can never match.
+    expect(msgs.join(' ')).not.toContain('@4.17.21');
+  });
+});
+
+// A pinned install of a covered package MUST surface that package's facts —
+// this is the hook's hero scenario (ua-parser-js@0.7.29 is one of the exact
+// hijacked versions the corpus warns about). Regression for the version-suffix
+// gap found in the feature audit.
+describe('versioned installs still hit the facts lookup', () => {
+  it('npm: surfaces L2 facts for a pinned covered package', () => {
+    const msgs = runHookAll('npm install ua-parser-js@0.7.29');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0]).toContain('ua-parser-js');
+    expect(msgs[0]).not.toContain('No facts on file');
+    expect(msgs[0].toLowerCase()).toMatch(/vuln|incident/);
+  });
+
+  it('npm: preserves the scope while stripping the version', () => {
+    const msgs = runHookAll('pnpm add @scope/pkg@2.0.0');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0]).toContain('@scope/pkg');
+    expect(msgs[0]).not.toContain('@2.0.0');
+  });
+
+  it('pypi: strips == / >= specifiers before lookup and display', () => {
+    const msgs = runHookAll('pip install requests==2.31.0');
+    expect(msgs.length).toBe(1);
+    expect(msgs[0]).toContain('requests');
+    expect(msgs[0]).not.toContain('==2.31.0');
   });
 });

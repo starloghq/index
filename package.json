@@ -1,6 +1,6 @@
 {
   "name": "starloghq",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "mcpName": "io.github.starloghq/starlog",
   "description": "Better library decisions for your AI coding agent — a local MCP tool and package-install hook that indexes library capabilities. Free, no account.",
   "keywords": [
@@ -46,8 +46,10 @@
     "bench:facts": "tsx scripts/bench-facts.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "check:versions": "node scripts/check-versions.mjs",
     "smoke": "bash scripts/smoke-test.sh",
-    "verify:release": "bash scripts/verify-release.sh"
+    "verify:release": "bash scripts/verify-release.sh",
+    "version": "node scripts/sync-server-version.mjs && git add server.json"
   },
   "engines": {
     "node": ">=20"

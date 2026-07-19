@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { CapabilityManifestSchema, type CapabilityManifest } from '../manifest/schema.js';
+import { resolveOverlayPath } from './overlay-path.js';
 
 /**
  * Load org-private capability manifests from STARLOG_PRIVATE_CORPUS — the
@@ -17,14 +18,15 @@ import { CapabilityManifestSchema, type CapabilityManifest } from '../manifest/s
  * does NOT rank — it only sources the org manifests.
  */
 export function loadPrivateCorpus(path?: string): CapabilityManifest[] {
-  if (!path) return [];
+  const resolved = resolveOverlayPath(path);
+  if (!resolved) return [];
 
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf-8'));
+    parsed = JSON.parse(readFileSync(resolved, 'utf-8'));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[starlog] private corpus file unreadable (${path}): ${msg}; using public corpus only.`);
+    console.error(`[starlog] private corpus file unreadable (${resolved}): ${msg}; using public corpus only.`);
     return [];
   }
 

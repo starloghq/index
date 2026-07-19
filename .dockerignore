@@ -1,0 +1,12 @@
+# Keep the build context lean and deterministic. dist/ and node_modules are
+# rebuilt inside the image; the rest is local dev/CI cruft the server never needs.
+node_modules
+dist
+.git
+.github
+*.log
+.starlog
+.planning
+coverage
+npm-debug.log*
+*.tgz

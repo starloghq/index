@@ -5,6 +5,9 @@ import { readFile, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { loadCorpus } from './engine/corpus.js';
+import { resolveOverlayPath } from './engine/overlay-path.js';
+import { getPackageRoot, getPackageVersion } from './paths.js';
+import { compareVersions, fetchLatestVersion, updateCheckDisabled } from './update-check.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -199,6 +202,33 @@ async function checkHook(settings: Record<string, unknown> | null): Promise<Chec
       const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
       checks.push({ level: 'fail', label: 'PostToolUse hook', detail: `script has a syntax error (${msg})` });
     }
+
+    // The installed hook is a thin shim that loads the package's dist/hook-runner.js
+    // at runtime (so upgrades refresh behaviour with no re-init). Verify that logic
+    // module is actually resolvable — a broken upgrade would otherwise silently stop
+    // surfacing facts. Only meaningful for the shim; a legacy self-contained hook has
+    // no such dependency, so we skip the check when the marker is absent.
+    const runnerPath = join(getPackageRoot(), 'dist', 'hook-runner.js');
+    const isShim = await readFile(HOOK_PATH, 'utf8').then((c) => c.includes('hook-runner.js')).catch(() => false);
+    if (isShim) {
+      checks.push(
+        (await fileExists(runnerPath))
+          ? { level: 'ok', label: 'Hook logic', detail: 'hook-runner.js resolves — upgrades refresh behaviour with no re-init' }
+          : { level: 'fail', label: 'Hook logic', detail: `shim cannot load its logic (${runnerPath} missing) — re-run \`starlog init\`` },
+      );
+    } else {
+      // A legacy self-contained hook (installed before the runtime-shim migration)
+      // still carries its logic inline, so a package upgrade never refreshes it —
+      // the user keeps whatever hook shipped with the version they first init'd,
+      // including any since-fixed bug. `--check` passes and it still runs, so the
+      // check above reports [ok]; without this the user is never told they're
+      // frozen on old behaviour. Warn (not fail) and point at the one-command fix.
+      checks.push({
+        level: 'warn',
+        label: 'Hook logic',
+        detail: 'legacy self-contained hook — it will not auto-refresh on upgrade; re-run `starlog init` to adopt the shim (zero-touch upgrades)',
+      });
+    }
   } else {
     checks.push({ level: 'fail', label: 'PostToolUse hook', detail: 'registered in settings but script file is missing' });
   }
@@ -263,16 +293,42 @@ async function checkRanker(settings: Record<string, unknown> | null): Promise<Ch
   return { level: 'ok', label: 'Ranking', detail: rankingState(settings).detail };
 }
 
+// ── Version staleness (best-effort) ──────────────────────────────────────────
+//
+// A stale install of a security tool is a liability, so doctor nudges when a
+// newer `starloghq` is published. Best-effort by design: skipped on opt-out,
+// and any network failure returns null (no check line) rather than a red mark —
+// a diagnostic must never hang or fail because npm was unreachable.
+async function checkForUpdate(): Promise<Check | null> {
+  if (updateCheckDisabled()) return null;
+  let current: string;
+  try {
+    current = getPackageVersion();
+  } catch {
+    return null;
+  }
+  const latest = await fetchLatestVersion();
+  if (!latest) return null; // offline / opt-out / bad response — stay silent
+  if (compareVersions(latest, current) > 0) {
+    return {
+      level: 'warn',
+      label: 'Version',
+      detail: `${latest} available (you have ${current}) — upgrade with \`npm install -g starloghq@latest\``,
+    };
+  }
+  return { level: 'ok', label: 'Version', detail: `up to date (${current})` };
+}
+
 // ── Private overlays (vetting + discovery + policy) ──────────────────────────
 //
 // Two distinct things, both invisible without this check:
 //  1. Is the MCP server WIRED to read per-project overlays? (the baked
 //     STARLOG_PRIVATE_* env — absent on installs predating that wiring.)
 //  2. What has THIS project actually authored under `.starlog/`?
-const OVERLAY_FILES: Array<{ rel: string; key: string; label: string }> = [
-  { rel: '.starlog/private-facts.json', key: 'l2', label: 'vetting' },
-  { rel: '.starlog/private-corpus.json', key: 'manifests', label: 'discovery' },
-  { rel: '.starlog/policy.json', key: 'rules', label: 'policy' },
+const OVERLAY_FILES: Array<{ rel: string; key: string; label: string; envKey: string }> = [
+  { rel: '.starlog/private-facts.json', key: 'l2', label: 'vetting', envKey: 'STARLOG_PRIVATE_FACTS' },
+  { rel: '.starlog/private-corpus.json', key: 'manifests', label: 'discovery', envKey: 'STARLOG_PRIVATE_CORPUS' },
+  { rel: '.starlog/policy.json', key: 'rules', label: 'policy', envKey: 'STARLOG_POLICY' },
 ];
 
 function mcpEnv(settings: Record<string, unknown> | null): Record<string, string> | null {
@@ -286,12 +342,28 @@ export async function checkPrivateOverlays(settings: Record<string, unknown> | n
   // 1. Wiring — only meaningful once the MCP server is configured at all.
   if (resolveMcpCommand(settings)) {
     const env = mcpEnv(settings);
-    const wired = !!(env?.STARLOG_PRIVATE_CORPUS && env?.STARLOG_PRIVATE_FACTS);
-    checks.push(
-      wired
-        ? { level: 'ok', label: 'Private overlays wired', detail: 'agent reads this project’s .starlog/ (vetting + discovery + policy)' }
-        : { level: 'warn', label: 'Private overlays wired', detail: 'MCP server has no overlay env — re-run `starlog init` so the agent reads private facts/discovery' },
-    );
+    const present = !!(env?.STARLOG_PRIVATE_CORPUS && env?.STARLOG_PRIVATE_FACTS);
+    if (!present) {
+      checks.push({ level: 'warn', label: 'Private overlays wired', detail: 'MCP server has no overlay env — re-run `starlog init` so the agent reads private facts/discovery' });
+    } else {
+      // Presence of the env key is NOT enough. Resolve each wired path exactly as the
+      // server will at runtime — it expands `${CLAUDE_PROJECT_DIR}` to THIS project
+      // root — and confirm it lands on <projectDir>/.starlog/. A path that resolves
+      // elsewhere (a stale absolute path, a cross-project leak, a typo) means the agent
+      // silently reads a different location, which the old presence-only check missed.
+      const misrouted: string[] = [];
+      for (const { rel, label, envKey } of OVERLAY_FILES) {
+        const raw = env?.[envKey];
+        if (!raw) continue; // policy is optional; absent key is not a misroute
+        const resolved = resolveOverlayPath(raw, projectDir);
+        if (resolved !== join(projectDir, rel)) misrouted.push(`${label} → ${resolved}`);
+      }
+      checks.push(
+        misrouted.length === 0
+          ? { level: 'ok', label: 'Private overlays wired', detail: 'agent reads this project’s .starlog/ (vetting + discovery + policy)' }
+          : { level: 'warn', label: 'Private overlays wired', detail: `MCP env points outside this project (${misrouted.join('; ')}) — the agent won't read ${join(projectDir, '.starlog')}; re-run \`starlog init\`` },
+      );
+    }
   }
 
   // 2. What's authored in THIS project (counts, and a nudge when empty).
@@ -346,6 +418,8 @@ export async function runDoctor(): Promise<number> {
   if (orgCorpus) checks.push(orgCorpus);
   checks.push(...(await checkProjectAgents(projectDir)));
   checks.push(await checkRanker(settings));
+  const update = await checkForUpdate();
+  if (update) checks.push(update);
 
   for (const c of checks) print(c);
 

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { resolveOverlayPath } from '../overlay-path.js';
 import { L1CapabilityFactSchema, type L1CapabilityFact } from '@starloghq/facts-schema';
 import { type L2Overlay } from '@starloghq/facts-schema';
 import { handAuthoredL2Source, overlaySource, parseOverlay, type L2Source } from './l2-source.js';
@@ -55,13 +56,14 @@ export function resolvePackage(query: string, keys: string[]): string | null {
  */
 export function loadPrivateFacts(path?: string): { l1: Record<string, L1CapabilityFact>; l2: Record<string, L2Overlay> } {
   const empty = { l1: {}, l2: {} };
-  if (!path) return empty;
+  const resolved = resolveOverlayPath(path);
+  if (!resolved) return empty;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf-8'));
+    parsed = JSON.parse(readFileSync(resolved, 'utf-8'));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[starlog] private facts file unreadable (${path}): ${msg}; using public facts only.`);
+    console.error(`[starlog] private facts file unreadable (${resolved}): ${msg}; using public facts only.`);
     return empty;
   }
   const obj = (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? (parsed as Record<string, unknown>) : {};
@@ -83,18 +85,19 @@ export function loadPrivateFacts(path?: string): { l1: Record<string, L1Capabili
  * (no policy → every verdict is 'none'). Never throws.
  */
 export function loadPolicy(path?: string): L3Policy | null {
-  if (!path) return null;
+  const resolved = resolveOverlayPath(path);
+  if (!resolved) return null;
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(path, 'utf-8'));
+    parsed = JSON.parse(readFileSync(resolved, 'utf-8'));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error(`[starlog] policy file unreadable (${path}): ${msg}; no org policy applied.`);
+    console.error(`[starlog] policy file unreadable (${resolved}): ${msg}; no org policy applied.`);
     return null;
   }
   const r = L3PolicySchema.safeParse(parsed);
   if (!r.success) {
-    console.error(`[starlog] policy file invalid (${path}); no org policy applied.`);
+    console.error(`[starlog] policy file invalid (${resolved}); no org policy applied.`);
     return null;
   }
   return r.data;

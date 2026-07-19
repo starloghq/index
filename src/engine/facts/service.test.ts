@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -114,6 +114,39 @@ describe('loadPolicy — independent L3 input', () => {
   it('invalid / unreadable policy → null (never throws)', () => {
     expect(loadPolicy(write({ rules: 'nope' }))).toBeNull();
     expect(loadPolicy(write('{ bad'))).toBeNull();
+  });
+});
+
+describe('loadPrivateFacts / loadPolicy — resolve ${CLAUDE_PROJECT_DIR} at runtime (issue #57)', () => {
+  // The MCP server receives STARLOG_PRIVATE_FACTS / STARLOG_POLICY as literal
+  // `${CLAUDE_PROJECT_DIR}/...` tokens (Claude Code does not expand them in the env
+  // block), so the loaders must expand them from process.env at read time.
+  let dir: string | null = null;
+  let savedProj: string | undefined;
+  beforeEach(() => { savedProj = process.env.CLAUDE_PROJECT_DIR; });
+  afterEach(() => {
+    if (dir) { rmSync(dir, { recursive: true, force: true }); dir = null; }
+    if (savedProj === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+    else process.env.CLAUDE_PROJECT_DIR = savedProj;
+  });
+
+  it('loadPrivateFacts expands the literal ${CLAUDE_PROJECT_DIR} token', () => {
+    dir = mkdtempSync(join(tmpdir(), 'starlog-cpd-facts-'));
+    writeFileSync(join(dir, 'private-facts.json'), JSON.stringify({
+      l1: [{ package: '@acme/auth', ecosystem: 'npm', version_range: null, artifact_sha256: null, effect_surface: 'internal', capabilities: [], provenance: { derived_by: 'hand', source: 'acme', verified: true } }],
+      l2: [],
+    }), 'utf-8');
+    process.env.CLAUDE_PROJECT_DIR = dir;
+    const { l1 } = loadPrivateFacts('${CLAUDE_PROJECT_DIR}/private-facts.json');
+    expect(l1['@acme/auth']).toBeDefined();
+  });
+
+  it('loadPolicy expands the literal ${CLAUDE_PROJECT_DIR} token', () => {
+    dir = mkdtempSync(join(tmpdir(), 'starlog-cpd-pol-'));
+    writeFileSync(join(dir, 'policy.json'), JSON.stringify({ org: 'acme', rules: [{ id: 'r1', decision: 'deny', match: { license_risk: 'copyleft-strong' }, rationale: 'no AGPL' }] }), 'utf-8');
+    process.env.CLAUDE_PROJECT_DIR = dir;
+    const pol = loadPolicy('${CLAUDE_PROJECT_DIR}/policy.json');
+    expect(pol?.org).toBe('acme');
   });
 });
 

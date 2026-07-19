@@ -209,4 +209,25 @@ describe('formatTable()', () => {
     const output = formatTable([makeResult({ relevance_score: 100 })]);
     expect(output).toContain('100.00');
   });
+
+  // Regression (feature audit BUG-1): a name longer than the old fixed 20-char
+  // column ran straight into the category ("Flagsmith JavaScript Clientfeature-flags").
+  it('keeps a gutter between long library names and the category column', () => {
+    const longName = 'Flagsmith JavaScript Client';
+    const result = makeResult({
+      manifest: { ...makeResult().manifest, name: longName, category: 'feature-flags' },
+    });
+    const output = formatTable([result]);
+    expect(output).not.toContain(`${longName}feature-flags`);
+    expect(output).toContain(`${longName}  `);
+  });
+
+  it('keeps header and row columns aligned when widths grow', () => {
+    const longName = 'A'.repeat(30);
+    const result = makeResult({ manifest: { ...makeResult().manifest, name: longName } });
+    const output = formatTable([result]);
+    const [header, , row] = output.split('\n');
+    // Header 'Category' and the row's category start at the same column.
+    expect(header.indexOf('Category')).toBe(row.indexOf('authentication'));
+  });
 });

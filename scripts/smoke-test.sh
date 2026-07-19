@@ -38,6 +38,7 @@ WORK="$(mktemp -d "${TMPDIR:-/tmp}/starlog-smoke.XXXXXX")"
 export HOME="$WORK/home"
 export npm_config_prefix="$WORK/npm-global"
 export npm_config_userconfig="$WORK/.npmrc"   # ignore any real ~/.npmrc (and its tokens)
+export STARLOG_NO_UPDATE_CHECK=1              # keep doctor's version check off the network in the gate
 mkdir -p "$HOME" "$npm_config_prefix"
 : > "$npm_config_userconfig"
 export PATH="$npm_config_prefix/bin:$PATH"
@@ -114,6 +115,15 @@ check "init applies cleanly" $?
 check "settings.json gains the starlog MCP server" $?
 ls "$HOME"/.claude/hooks/*.js >/dev/null 2>&1
 check "PostToolUse hook script is written" $?
+
+# The hook is a thin shim that loads the package's dist/hook-runner.js at runtime,
+# so `npm update` refreshes hook behaviour with no re-init. Prove it actually
+# resolves that module and surfaces facts from a REAL global install — not just
+# that the shim file exists. event-stream carries a known L2 incident record.
+HOOK_JS="$HOME/.claude/hooks/starlog-pkg-check.js"
+HOOK_OUT="$(printf '%s' "{\"tool_input\":{\"command\":\"npm install event-stream\"},\"cwd\":\"$PROJECT\"}" | node "$HOOK_JS" 2>/dev/null)"
+echo "$HOOK_OUT" | grep -q 'event-stream'
+check "PostToolUse hook resolves its logic module and surfaces facts (zero-touch upgrade path)" $?
 
 starlog doctor 2>&1 | grep -qi "starlog_search available"
 check "doctor (post-init) confirms MCP handshake" $?

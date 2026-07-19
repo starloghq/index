@@ -184,10 +184,10 @@ describe('corpus add -> search private-first discovery round-trip (e2e, spawned 
     expect(firstDataRow).toContain('Acme Flags');
   });
 
-  // 2. Default-path branch: `corpus add` with env UNSET writes ./.starlog/ but a BARE
-  //    `search` does NOT auto-read it — only the printed STARLOG_PRIVATE_CORPUS hint
-  //    makes it discoverable. The hint is load-bearing UX, locked here.
-  it('Default-path corpus add is NOT auto-discoverable to bare `search` — the env-set hint is load-bearing', () => {
+  // 2. Default-path branch: `corpus add` with env UNSET writes ./.starlog/, and a BARE
+  //    `search` from the project now AUTO-READS it (walking up from cwd) — matching the
+  //    agent, with no STARLOG_PRIVATE_CORPUS export needed (issue #59).
+  it('Default-path corpus add IS auto-discoverable to a bare `search` from the project (issue #59)', () => {
     const cwd = newTmpDir();
 
     // No STARLOG_PRIVATE_CORPUS -> the default-path branch.
@@ -197,27 +197,27 @@ describe('corpus add -> search private-first discovery round-trip (e2e, spawned 
       '--category', 'feature-flags', '--stack', 'node', '--best-for', 'feature flags,remote config',
     ]);
     expect(add.status).toBe(0);
-    // Default-path branch text (distinct from the custom-path branch in test 1).
+    // Default-path branch text advertises auto-discovery — no shell export needed.
     expect(add.stdout).toContain("Your coding agent's search surfaces this automatically, per-project, after `starlog init`");
-    expect(add.stdout).toContain('Try it from this shell: STARLOG_PRIVATE_CORPUS=.starlog/private-corpus.json starlog search');
+    expect(add.stdout).toContain('Try it from this project: starlog search');
 
     const defaultPath = join(cwd, '.starlog', 'private-corpus.json');
     expect(existsSync(defaultPath)).toBe(true);
 
-    // BARE search (env unset): the default path is NOT auto-read by the CLI, so the
-    // internal package is ABSENT from the public-only results.
+    // BARE search (env unset): the CLI now auto-reads ./.starlog/, so the internal
+    // package is present — and #1 under pure score ordering.
     const bare = runRawCli(cwd, ['search', 'feature flags for node', '--format', 'json', '--diversity', '1.0']);
     expect(bare.status).toBe(0);
-    expect(hasId(parseResults(bare.stdout), '@acme/flags')).toBe(false);
+    const bareResults = parseResults(bare.stdout);
+    expect(bareResults[0].manifest?.id).toBe('@acme/flags');
+    expect(bareResults[0].relevance_score).toBeGreaterThanOrEqual(70);
 
-    // Follow the printed hint -> the internal package is now #1.
-    const wired = runRawCli(cwd, ['search', 'feature flags for node', '--format', 'json', '--diversity', '1.0'], {
-      STARLOG_PRIVATE_CORPUS: '.starlog/private-corpus.json',
-    });
-    expect(wired.status).toBe(0);
-    const wiredResults = parseResults(wired.stdout);
-    expect(wiredResults[0].manifest?.id).toBe('@acme/flags');
-    expect(wiredResults[0].relevance_score).toBeGreaterThanOrEqual(70);
+    // Auto-discovery also works from a NESTED subdirectory (walks up to the project root).
+    const nested = join(cwd, 'packages', 'web');
+    mkdirSync(nested, { recursive: true });
+    const fromNested = runRawCli(nested, ['search', 'feature flags for node', '--format', 'json', '--diversity', '1.0']);
+    expect(fromNested.status).toBe(0);
+    expect(hasId(parseResults(fromNested.stdout), '@acme/flags')).toBe(true);
   });
 
   // 3. Monorepo tenant isolation: each project dir's relative .starlog/ overlay is

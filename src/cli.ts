@@ -3,6 +3,7 @@ import { Command } from 'commander';
 import { formatTable, formatJSON } from './engine/format.js';
 import { KnownCategorySchema } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
+import { overlayPath } from './engine/overlay-discovery.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
 import { startMcpServer } from './mcp.js';
@@ -117,6 +118,14 @@ program
       process.exit(1);
     }
 
+    // Validate --top-k: a non-numeric or non-positive value would otherwise
+    // silently default (5) or return an empty set that reads as a misleading
+    // "no strong match". Reject it loudly instead (parity with the MCP schema).
+    if (!/^\d+$/.test(String(opts.topK)) || Number.parseInt(opts.topK as string, 10) < 1) {
+      console.error(`Invalid --top-k "${opts.topK}". Use a positive integer (e.g. 5).`);
+      process.exit(1);
+    }
+
     // Shared search service: delegates to the hosted API when STARLOG_API_KEY
     // is set, otherwise runs the local engine — and falls back to local on API
     // failure (parity with the MCP server).
@@ -128,6 +137,10 @@ program
       top_k: Number.isNaN(topK) ? undefined : topK,
       context: opts.context,
       diversity_lambda: (opts as { diversity?: number }).diversity,
+      // CLI parity: the MCP server reads the baked env var; the CLI falls back to a
+      // project-local `.starlog/private-corpus.json` (walking up from cwd) so a bare
+      // `starlog search` surfaces the org's private packages without an `export`.
+      privateCorpusPath: overlayPath(process.env.STARLOG_PRIVATE_CORPUS, 'private-corpus.json'),
     });
 
     await track(
@@ -243,7 +256,12 @@ facts
     // Same API-first serve path as the MCP server: hosted facts (org-private L2
     // + policy) when STARLOG_API_KEY is set, with the local layered corpus
     // (public L1+L2 + STARLOG_PRIVATE_FACTS/STARLOG_POLICY) as the offline fallback.
-    const local = buildComposeDeps();
+    // CLI parity: fall back to a project-local `.starlog/` (walking up from cwd) for
+    // the vetting + policy overlays when the env vars aren't set (the MCP server bakes
+    // them; a bare CLI run otherwise wouldn't see them).
+    const factsPath = overlayPath(process.env.STARLOG_PRIVATE_FACTS, 'private-facts.json');
+    const policyPath = overlayPath(process.env.STARLOG_POLICY, 'policy.json');
+    const local = buildComposeDeps({ ...process.env, STARLOG_PRIVATE_FACTS: factsPath, STARLOG_POLICY: policyPath });
     const api = createFactsApiClient();
     const view = await resolveFactView(pkg, { local, api });
 
@@ -252,8 +270,8 @@ facts
       {
         hit: view !== null,
         format: opts.format,
-        private_overlay: !!process.env.STARLOG_PRIVATE_FACTS,
-        policy: !!process.env.STARLOG_POLICY,
+        private_overlay: !!factsPath,
+        policy: !!policyPath,
         api: !!api,
       },
       { noTelemetry: noTelemetry() },
@@ -355,7 +373,7 @@ facts
         console.log(`Added ${pkg} to ${path}.`);
         if (path === DEFAULT_PRIVATE_FACTS) {
           console.log(`Your coding agent reads this automatically, per-project, after \`starlog init\` (no shell export needed).`);
-          console.log(`Vet it from this shell: STARLOG_PRIVATE_FACTS=${path} starlog facts ${pkg}`);
+          console.log(`Vet it from this project: starlog facts ${pkg}`);
         } else {
           console.log(`Note: \`starlog init\` wires the agent to the default ${DEFAULT_PRIVATE_FACTS}; a custom path is read by the CLI only.`);
           console.log(`Vet it: STARLOG_PRIVATE_FACTS=${path} starlog facts ${pkg}`);
@@ -392,8 +410,8 @@ facts
       if (envPath) {
         console.log(`Your agent already reads this policy (STARLOG_POLICY). Vet it now: starlog facts ${pkg}`);
       } else {
-        console.log(`To have your agent apply it, set:  export STARLOG_POLICY=${path}`);
-        console.log(`Then vet it: STARLOG_POLICY=${path} starlog facts ${pkg}`);
+        console.log(`Your coding agent applies this automatically, per-project, after \`starlog init\`.`);
+        console.log(`Try it from this project: starlog facts ${pkg}`);
       }
     }),
   );
@@ -606,7 +624,7 @@ corpus
         console.log(`Added ${pkg} to ${path} (discovery).`);
         if (path === DEFAULT_PRIVATE_CORPUS) {
           console.log(`Your coding agent's search surfaces this automatically, per-project, after \`starlog init\` (no shell export needed).`);
-          console.log(`Try it from this shell: STARLOG_PRIVATE_CORPUS=${path} starlog search "<the capability>"`);
+          console.log(`Try it from this project: starlog search "<the capability>"`);
         } else {
           console.log(`Note: \`starlog init\` wires the agent to the default ${DEFAULT_PRIVATE_CORPUS}; a custom path is searched by the CLI only.`);
           console.log(`Try it: STARLOG_PRIVATE_CORPUS=${path} starlog search "<the capability>"`);

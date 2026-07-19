@@ -13,10 +13,15 @@ export function formatJSON(results: QueryResult[]): string {
 export function formatTable(results: QueryResult[]): string {
   if (results.length === 0) return '';
 
+  // Column widths grow with the data (plus a 2-space gutter) so a long library
+  // name or category can never run into the next column.
+  const nameWidth = Math.max('Library'.length, ...results.map((r) => r.manifest.name.length)) + 2;
+  const categoryWidth = Math.max('Category'.length, ...results.map((r) => r.manifest.category.length)) + 2;
+
   const header = [
     '#'.padEnd(4),
-    'Library'.padEnd(20),
-    'Category'.padEnd(18),
+    'Library'.padEnd(nameWidth),
+    'Category'.padEnd(categoryWidth),
     'Score'.padEnd(8),
     'Solves',
   ].join('');
@@ -30,8 +35,8 @@ export function formatTable(results: QueryResult[]): string {
 
     let row = [
       String(i + 1).padEnd(4),
-      r.manifest.name.padEnd(20),
-      r.manifest.category.padEnd(18),
+      r.manifest.name.padEnd(nameWidth),
+      r.manifest.category.padEnd(categoryWidth),
       r.relevance_score.toFixed(2).padEnd(8),
       solves,
     ].join('');

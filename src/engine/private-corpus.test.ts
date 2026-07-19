@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -77,5 +77,26 @@ describe('loadPrivateCorpus — env-driven private manifest overlay (mirror of l
   it('returns [] when the shape is wrong (no manifests array)', () => {
     const path = writeTmp({ notManifests: [] });
     expect(loadPrivateCorpus(path)).toEqual([]);
+  });
+});
+
+describe('loadPrivateCorpus — resolves ${CLAUDE_PROJECT_DIR} in the path at runtime (issue #57)', () => {
+  let savedProj: string | undefined;
+  beforeEach(() => {
+    savedProj = process.env.CLAUDE_PROJECT_DIR;
+  });
+  afterEach(() => {
+    if (savedProj === undefined) delete process.env.CLAUDE_PROJECT_DIR;
+    else process.env.CLAUDE_PROJECT_DIR = savedProj;
+  });
+
+  it('loads a corpus wired with the literal ${CLAUDE_PROJECT_DIR} token (the real incident)', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'starlog-cpd-corpus-'));
+    writeFileSync(join(dir, 'private-corpus.json'), JSON.stringify({ manifests: [validManifest()] }), 'utf-8');
+    process.env.CLAUDE_PROJECT_DIR = dir;
+    // The MCP server receives this token LITERAL (Claude Code does not expand it
+    // in the env block); the loader must expand it from process.env at read time.
+    const out = loadPrivateCorpus('${CLAUDE_PROJECT_DIR}/private-corpus.json');
+    expect(out.map((m) => m.id)).toEqual(['acme-auth']);
   });
 });

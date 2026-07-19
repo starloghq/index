@@ -1,9 +1,12 @@
 import { afterEach, describe, it, expect } from 'vitest';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
+import { createServer, type Server } from 'node:http';
+import { once } from 'node:events';
+import { AddressInfo } from 'node:net';
 
 /**
  * End-to-end tests for `starlog doctor` across un-wired / corrupt / half-migrated
@@ -66,6 +69,7 @@ function runDoctor(cwd: string, home: string): RunResult {
   env.STARLOG_TELEMETRY = '0';
   env.DO_NOT_TRACK = '1';
   env.CI = '1';
+  env.STARLOG_NO_UPDATE_CHECK = '1'; // keep the version check off the network in these state tests
   env.HOME = home; // applied LAST so it wins over the inherited value
   const r = spawnSync('node', [CLI, 'doctor'], { cwd, encoding: 'utf8', env });
   return { status: r.status ?? -1, stdout: r.stdout ?? '', stderr: r.stderr ?? '' };
@@ -188,6 +192,88 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
       const { stdout } = runDoctor(cwd, home);
       expect(stdout).toContain('hosted ranking');
       expect(stdout).not.toContain('get a key at https://starlog.dev');
+    }
+  });
+
+  // 2c. HOOK SHIM — a shim hook (loads dist/hook-runner.js) reports "Hook logic"
+  //     resolving against the built runner, proving upgrades refresh behaviour
+  //     without a re-init. The runner ships in dist/, so it resolves.
+  it('reports Hook logic resolving when the installed hook is the runtime-shim form', () => {
+    const { home, cwd } = freshDirs();
+    const hooksDir = join(home, '.claude', 'hooks');
+    mkdirSync(hooksDir, { recursive: true });
+    // Minimal valid-JS stand-in carrying the shim marker doctor keys on.
+    writeFileSync(join(hooksDir, 'starlog-pkg-check.js'), '// loads dist/hook-runner.js\nprocess.exit(0)\n', 'utf8');
+    writeSettings(home, {
+      mcpServers: {},
+      hooks: { PostToolUse: [{ matcher: '', hooks: [{ type: 'command', command: 'node ' + join(hooksDir, 'starlog-pkg-check.js') }] }] },
+    });
+    const { stdout } = runDoctor(cwd, home);
+    expect(stdout).toContain('Hook logic');
+    expect(stdout).toContain('resolves');
+  });
+
+  // 2d. LEGACY HOOK — a self-contained hook installed before the runtime-shim
+  //     migration (no dist/hook-runner.js marker) passes --check and still runs,
+  //     so it reports [ok] "script present and valid" — but its logic is frozen
+  //     inline and never refreshes on upgrade. doctor must warn and point at the
+  //     one-command fix (re-run init to adopt the shim), so an upgraded user on an
+  //     old (possibly since-fixed) hook is never left silently blessed.
+  it('warns to re-init when the installed hook is the legacy self-contained form', () => {
+    const { home, cwd } = freshDirs();
+    const hooksDir = join(home, '.claude', 'hooks');
+    mkdirSync(hooksDir, { recursive: true });
+    // Valid JS, but NO 'hook-runner.js' marker → doctor treats it as legacy inline.
+    writeFileSync(join(hooksDir, 'starlog-pkg-check.js'), '// self-contained legacy hook\nprocess.exit(0)\n', 'utf8');
+    writeSettings(home, {
+      mcpServers: {},
+      hooks: { PostToolUse: [{ matcher: '', hooks: [{ type: 'command', command: 'node ' + join(hooksDir, 'starlog-pkg-check.js') }] }] },
+    });
+    const { stdout } = runDoctor(cwd, home);
+    expect(stdout).toContain('Hook logic');
+    expect(stdout).toContain('legacy self-contained hook');
+    expect(stdout).toContain('starlog init');
+    // The [ok] script line still prints — the warning is additive, not a replacement.
+    expect(stdout).toContain('script present and valid');
+  });
+
+  // 2e. VERSION STALENESS — doctor nudges when the registry advertises a newer
+  //     starloghq than the installed one. A local HTTP stand-in (STARLOG_REGISTRY_URL)
+  //     keeps it hermetic; the check is best-effort so it never fails the run.
+  it('nudges to upgrade when the registry has a newer version', async () => {
+    const server: Server = createServer((req, res) => {
+      if (req.url === '/starloghq/latest') {
+        res.setHeader('content-type', 'application/json');
+        res.end(JSON.stringify({ version: '99.0.0' }));
+      } else {
+        res.statusCode = 404;
+        res.end();
+      }
+    });
+    server.listen(0);
+    await once(server, 'listening');
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const { home, cwd } = freshDirs();
+      const env: Record<string, string | undefined> = { ...process.env };
+      delete env.STARLOG_NO_UPDATE_CHECK; // enable the check for this scenario
+      env.STARLOG_REGISTRY_URL = `http://127.0.0.1:${port}`;
+      env.STARLOG_TELEMETRY = '0';
+      env.DO_NOT_TRACK = '1';
+      env.CI = '1';
+      env.HOME = home;
+      // Async spawn (not spawnSync): the registry stand-in runs in THIS process's
+      // event loop, so a synchronous spawn would block it and the child's fetch
+      // would never be served (it would time out to null). spawn keeps the loop free.
+      const child = spawn('node', [CLI, 'doctor'], { cwd, env });
+      let stdout = '';
+      child.stdout.on('data', (d) => (stdout += d.toString()));
+      const [code] = (await once(child, 'close')) as [number];
+      expect(stdout).toContain('99.0.0 available');
+      expect(stdout).toContain('npm install -g starloghq@latest');
+      expect(code).toBe(0); // staleness is advisory (warn), never a failure
+    } finally {
+      server.close();
     }
   });
 
