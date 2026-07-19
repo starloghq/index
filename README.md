@@ -184,6 +184,93 @@ starlog facts add @acme/flags --status active --license MIT
 
 These write `.starlog/private-corpus.json` (discovery) and `.starlog/private-facts.json` (vetting) in your project. Because `starlog init` bakes `${CLAUDE_PROJECT_DIR}/.starlog/*` into the MCP server's env, your coding agent picks them up **automatically in that project** — no shell `export`, nothing to re-run. Confirm with `starlog doctor` (it reports the wiring and what each project has authored). For richer overlays — full `l1`/`l2` arrays, org `STARLOG_POLICY` allow/deny verdicts, or pushing to the hosted API with `starlog facts push` — see [docs/FACTS-CONTRACT.md](docs/FACTS-CONTRACT.md).
 
+### Company-hosted discovery corpus
+
+Share the same discovery manifests across every engineer without changing how they're generated. One team publishes a static JSON file; every client pulls it on each search run and merges it between the bundled corpus and per-project `.starlog/private-corpus.json` overlays. Org packages surface **private-first** in `starlog_search`; local private still wins on id collision.
+
+#### Server side — generate and host the corpus
+
+**1. Generate the JSON file.** Use whichever authoring path you already use — the hosted file must be the same `{ "manifests": [ ... ] }` shape Starlog writes locally. Do not hand-roll stubs; entries that fail schema validation are dropped silently.
+
+Bulk-ingest from a directory of internal checkouts (recommended for orgs with many repos):
+
+```bash
+# Writes .starlog/private-corpus.json (and private-facts.json, policy.suggested.json)
+starlog org sync ~/code/my-org
+
+# Or write to a dedicated publish path:
+starlog org sync ~/code/my-org --corpus-out ./publish/org-corpus.json
+```
+
+Or add packages one at a time:
+
+```bash
+starlog corpus add @acme/flags --solves "Feature flags + remote config for Acme Node services" \
+  --category feature-flags --stack node --best-for "gradual rollout,kill switches"
+# → .starlog/private-corpus.json
+```
+
+**2. Publish to static HTTPS.** Upload the corpus file to any URL your engineers can reach — S3 + CloudFront, GCS, Artifactory, an internal CDN, nginx, etc. Requirements:
+
+- **HTTPS** (or HTTP for local dev fixtures only)
+- **`Content-Type: application/json`**
+- **Body shape:** `{ "manifests": [ { "id": "@acme/flags", "solves": "...", "category": "feature-flags", ... }, ... ] }` — same schema as `corpus-free/` manifests
+- **Optional auth:** if the URL is not public, protect it with a Bearer token (see client side below)
+
+Example (S3):
+
+```bash
+aws s3 cp ./publish/org-corpus.json s3://my-bucket/starlog/org-corpus.json \
+  --content-type application/json
+# → https://corp.example.com/starlog/org-corpus.json
+```
+
+Re-publish whenever you re-run `org sync` or `corpus add` and want engineers to pick up new internal packages. v1 is read-only consumption — there is no `starlog org publish` push command.
+
+#### Client side — wire engineers' machines
+
+The MCP server does **not** inherit your shell environment, so a bare `export` only works for CLI one-offs. To wire your coding agent, use `starlog init`:
+
+```bash
+# Public URL:
+starlog init --org-corpus-url https://corp.example.com/starlog/org-corpus.json
+
+# Bearer-protected URL (token is baked into ~/.claude/settings.json MCP env):
+starlog init \
+  --org-corpus-url https://corp.example.com/starlog/org-corpus.json \
+  --org-corpus-token "$STARLOG_ORG_CORPUS_TOKEN"
+```
+
+This writes `STARLOG_ORG_CORPUS_URL` (and optionally `STARLOG_ORG_CORPUS_TOKEN`) into the Starlog MCP server's `env` block in `~/.claude/settings.json`. **Restart your agent** after init so it reloads the MCP server.
+
+Verify wiring:
+
+```bash
+starlog doctor   # reports "Org corpus URL wired" when configured
+```
+
+CLI one-off (no agent restart needed — shell env is enough):
+
+```bash
+export STARLOG_ORG_CORPUS_URL=https://corp.example.com/starlog/org-corpus.json
+export STARLOG_ORG_CORPUS_TOKEN=your-token   # only if the server requires Bearer auth
+starlog search "feature flags for node"
+```
+
+Per-project local overrides still work: `.starlog/private-corpus.json` in a repo overrides the org layer for the same package id, and `starlog init` already bakes `${CLAUDE_PROJECT_DIR}/.starlog/*` into the agent per project.
+
+#### Behavior and failure modes
+
+| Layer | Source | Precedence |
+|---|---|---|
+| Base | Bundled corpus (or hosted full corpus with `STARLOG_API_KEY`) | Lowest |
+| Org | `STARLOG_ORG_CORPUS_URL` | Middle — org ids float private-first |
+| Local | `STARLOG_PRIVATE_CORPUS` / `.starlog/private-corpus.json` | Highest — wins on id collision |
+
+- Fetched on **every** search run (10s timeout); no local cache of the org file.
+- Any fetch failure (network, 4xx/5xx, invalid JSON, schema rejects) **degrades silently** — search continues with base + local private only.
+- Org package names are **redacted in telemetry** (same as local private overlays).
+
 ## How it works
 
 Starlog vets a package as **three independent layers, composed at query time** — never collapsed into one blurry "score":

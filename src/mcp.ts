@@ -6,6 +6,7 @@ import { z } from 'zod/v4';
 import { KnownCategorySchema } from './manifest/schema.js';
 import type { QueryResult } from './manifest/schema.js';
 import { runSearch } from './search-service.js';
+import { getOrgCorpusPackageIds, fetchOrgCorpus } from './engine/org-corpus.js';
 import { buildComposeDeps, resolveFactView, createFactsApiClient, formatFactView } from './engine/facts.js';
 import { getPackageVersion } from './paths.js';
 import { track, pendingMcpDisclosure } from './telemetry.js';
@@ -76,6 +77,23 @@ export const FACTS_TOOL_DESCRIPTION =
 export function createServer(): McpServer {
   const server = new McpServer({ name: 'starlog', version: getPackageVersion() });
 
+  // Warm org-corpus package-id cache for telemetry redaction (no-op when URL unset).
+  // createServer() stays sync, so we kick the fetch here and ensure ids in the
+  // facts handler before building the redaction set — a sync snapshot at this
+  // point would be empty while the fetch (up to 10s) is in flight. If the warm
+  // fails, one coalesced retry runs on the first facts call so a transient
+  // startup blip does not permanently leak org-internal names into telemetry.
+  const orgCorpusWarm = fetchOrgCorpus();
+  let orgCorpusRetry: Promise<unknown> | null = null;
+
+  async function ensureOrgCorpusIdsForRedaction(): Promise<void> {
+    await orgCorpusWarm;
+    if (!process.env.STARLOG_ORG_CORPUS_URL?.trim()) return;
+    if (getOrgCorpusPackageIds().size > 0) return;
+    if (!orgCorpusRetry) orgCorpusRetry = fetchOrgCorpus();
+    await orgCorpusRetry;
+  }
+
   server.tool(
     'starlog_search',
     'Discover candidate packages for a capability: surfaces options for a need (org-sanctioned/private ones first when configured), with integration effort, best-for and skip-when notes. This is discovery — it surfaces what exists; to vet a specific named package (CVEs, license, maintenance), call starlog_facts. Use after you have a capability/need and want candidate package names.',
@@ -118,9 +136,13 @@ export function createServer(): McpServer {
         .describe('Optional project context for relevance, e.g. "Next.js SaaS, needs SSO"'),
     },
     async (args) => {
+      // Ensure org ids are in the cache before we build the redaction set.
+      // fetchOrgCorpus never throws; a failed warm gets one coalesced retry.
+      await ensureOrgCorpusIdsForRedaction();
+      const privatePackages = new Set([...factsLocal.privatePackages, ...getOrgCorpusPackageIds()]);
       const view = await resolveFactView(args.package, { local: factsLocal, api: factsApi });
       const disclosure = pendingMcpDisclosure();
-      if (!disclosure) void track('mcp_facts', mcpFactsEventProps(args, view, { usedApi: factsApi !== null, privatePackages: factsLocal.privatePackages }), { surface: 'mcp' });
+      if (!disclosure) void track('mcp_facts', mcpFactsEventProps(args, view, { usedApi: factsApi !== null, privatePackages }), { surface: 'mcp' });
       const text = formatFactView(args.package, view) + (disclosure ? `\n\n${disclosure}` : '');
       return { content: [{ type: 'text' as const, text }] };
     },

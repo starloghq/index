@@ -94,6 +94,9 @@ only the small `corpus-free` tier; with `STARLOG_API_KEY` set the **candidate se
 is fetched from the hosted full corpus, then ranked by the **same local engine** —
 so a key widens *what* can be found, never *how* it's scored. Any hosted failure
 falls back to the bundled corpus (`src/search-service.ts` → `engine/hosted-corpus.ts`).
+With `STARLOG_ORG_CORPUS_URL` set, a company-hosted `{ manifests }` JSON layer is
+fetched every run and merged between the base corpus and the per-machine private
+overlay (`engine/org-corpus.ts`).
 
 ```mermaid
 flowchart LR
@@ -102,7 +105,7 @@ flowchart LR
     key -- no --> bundled["bundled corpus-free<br/>→ candidate manifests"]
     hosted -. "no key / network / non-200 / garbage" .-> bundled
 
-    hosted --> merge["⊕ private corpus<br/>STARLOG_PRIVATE_CORPUS (private-first)"]
+    hosted --> merge["⊕ org remote<br/>STARLOG_ORG_CORPUS_URL<br/>⊕ local private<br/>STARLOG_PRIVATE_CORPUS (private-first)"]
     bundled --> merge
     merge --> rank["local keyword ranker<br/>absolute scores → 'no strong match' when thin"]
     rank --> results["ranked QueryResults → agent"]

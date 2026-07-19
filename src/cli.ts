@@ -197,7 +197,9 @@ program
   .option('-y, --yes', 'Apply changes without the confirmation prompt (for CI/non-interactive use)')
   .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
   .option('--api-key <key>', 'Wire your org STARLOG_API_KEY into the MCP server (enables hosted org-private facts for your agent) — get a key at https://starlog.dev')
-  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string }) => {
+  .option('--org-corpus-url <url>', 'Wire your company-hosted org discovery corpus URL into the MCP server (STARLOG_ORG_CORPUS_URL)')
+  .option('--org-corpus-token <token>', 'Optional Bearer token for the org corpus URL (STARLOG_ORG_CORPUS_TOKEN)')
+  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string; orgCorpusUrl?: string; orgCorpusToken?: string }) => {
     await runInit(opts);
 
     const agents = detectAgents();

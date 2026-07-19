@@ -385,6 +385,14 @@ export async function checkPrivateOverlays(settings: Record<string, unknown> | n
   return checks;
 }
 
+/** Report when a company-hosted org discovery corpus URL is wired in MCP env. */
+export function checkOrgCorpus(settings: Record<string, unknown> | null): Check | null {
+  if (!resolveMcpCommand(settings)) return null;
+  const url = mcpEnv(settings)?.STARLOG_ORG_CORPUS_URL?.trim();
+  if (!url) return null;
+  return { level: 'ok', label: 'Org corpus URL wired', detail: 'agent pulls company discovery manifests from STARLOG_ORG_CORPUS_URL' };
+}
+
 // ── Orchestrator ────────────────────────────────────────────────────────────
 
 export async function runDoctor(): Promise<number> {
@@ -406,6 +414,8 @@ export async function runDoctor(): Promise<number> {
   checks.push(...(await checkMcp(settings)));
   checks.push(...(await checkHook(settings)));
   checks.push(...(await checkPrivateOverlays(settings, projectDir)));
+  const orgCorpus = checkOrgCorpus(settings);
+  if (orgCorpus) checks.push(orgCorpus);
   checks.push(...(await checkProjectAgents(projectDir)));
   checks.push(await checkRanker(settings));
   const update = await checkForUpdate();
