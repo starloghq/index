@@ -125,7 +125,7 @@ HOOK_OUT="$(printf '%s' "{\"tool_input\":{\"command\":\"npm install event-stream
 echo "$HOOK_OUT" | grep -q 'event-stream'
 check "PostToolUse hook resolves its logic module and surfaces facts (zero-touch upgrade path)" $?
 
-starlog doctor 2>&1 | grep -qi "starlog_search available"
+starlog doctor 2>&1 | grep -qi "starlog_search + starlog_advise available"
 check "doctor (post-init) confirms MCP handshake" $?
 
 # --api-key wires the hosted key into the MCP server's own env block (the server
