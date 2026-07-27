@@ -44,14 +44,31 @@ function diyOnlyResult(): QueryResult {
 
 describe('runAdvise', () => {
   let dir: string;
+  let home: string;
+  let prevHome: string | undefined;
+  let prevTelemetry: string | undefined;
 
   beforeEach(() => {
     dir = mkdtempSync(join(tmpdir(), 'starlog-advise-'));
+    // Isolate the global pattern store (~/.starlog/patterns.json resolves via
+    // homedir()) so recurrence counts never leak across tests or in from the
+    // developer's real store — otherwise the watch/threshold assertions flake.
+    home = mkdtempSync(join(tmpdir(), 'starlog-home-'));
+    prevHome = process.env.HOME;
+    process.env.HOME = home;
+    // Keep the suite offline/hermetic regardless of the developer's shell env.
+    prevTelemetry = process.env.STARLOG_TELEMETRY;
+    process.env.STARLOG_TELEMETRY = '0';
     delete process.env.STARLOG_API_KEY;
   });
 
   afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+    if (prevHome === undefined) delete process.env.HOME;
+    else process.env.HOME = prevHome;
+    if (prevTelemetry === undefined) delete process.env.STARLOG_TELEMETRY;
+    else process.env.STARLOG_TELEMETRY = prevTelemetry;
     vi.restoreAllMocks();
   });
 
@@ -100,5 +117,41 @@ describe('runAdvise', () => {
 
     expect(result.action).toBe('packageize');
     expect(result.packageize_plan?.suggested_name).toContain('@acme/');
+  });
+
+  it('does not pass a project context to search (skips unused LLM enrichment)', async () => {
+    const spy = vi.spyOn(searchService, 'runSearch');
+    await runAdvise({
+      observation: 'DIY JWT authentication',
+      project_root: dir,
+      category: 'authentication',
+      force: true,
+    });
+    expect(spy).toHaveBeenCalled();
+    // Advise discards vs_custom/context_fit/tradeoffs, so it must not trigger
+    // search()'s per-candidate LLM round-trip by passing a projectContext.
+    expect(spy.mock.calls[0][0].context).toBeUndefined();
+  });
+
+  it('increments occurrences once per advise call, not twice', async () => {
+    // A tracked pattern needs signals, so seed DIY auth code the scanner detects.
+    const src = join(dir, 'src');
+    mkdirSync(src, { recursive: true });
+    writeFileSync(
+      join(src, 'session.ts'),
+      `import jwt from 'jsonwebtoken';\nexport const verify = (t: string) => jwt.verify(t, 'secret');`,
+    );
+    const call = () =>
+      runAdvise({
+        observation: 'DIY JWT authentication',
+        project_root: dir,
+        category: 'authentication',
+        force: true,
+      });
+    const first = await call();
+    const second = await call();
+    // A single observation per call must advance the recurrence count by 1.
+    // The migrate/packageize status update must not re-increment.
+    expect(second.occurrences! - first.occurrences!).toBe(1);
   });
 });

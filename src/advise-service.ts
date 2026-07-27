@@ -8,6 +8,7 @@ import {
   getGlobalPatternsPath,
   getProjectPatternsPath,
   upsertPattern,
+  updatePatternStatus,
   totalOccurrences,
 } from './patterns/store.js';
 import {
@@ -79,11 +80,9 @@ export async function runAdvise(args: AdviseArgs): Promise<AdviseResult> {
     };
   }
 
-  // Prefer a capability query so known libraries clear the safety gate; fold
-  // the observation into context instead of using it as the sole search string.
+  // Prefer a capability query so known libraries clear the safety gate; the
+  // observation already drives category detection and pattern signals above.
   const query = CATEGORY_SEARCH_QUERY[category] ?? category.replace(/-/g, ' ');
-  const contextParts = [args.context, args.observation].filter(Boolean);
-  const context = contextParts.length ? contextParts.join(' — ') : undefined;
 
   const privateCorpusPath =
     args.privateCorpusPath ?? overlayPath(process.env.STARLOG_PRIVATE_CORPUS, 'private-corpus.json', projectRoot);
@@ -91,10 +90,13 @@ export async function runAdvise(args: AdviseArgs): Promise<AdviseResult> {
     args.privateFactsPath ?? overlayPath(process.env.STARLOG_PRIVATE_FACTS, 'private-facts.json', projectRoot);
   const policyPath = args.policyPath ?? overlayPath(process.env.STARLOG_POLICY, 'policy.json', projectRoot);
 
+  // NB: deliberately no `context` here. A project context triggers search()'s
+  // per-candidate LLM enrichment (vs_custom/context_fit/tradeoffs) — advise
+  // never reads those fields, so passing it only adds a multi-second LLM
+  // round-trip and token cost per call. Ranking is unaffected by context.
   const searchArgs: SearchArgs = {
     query,
     category,
-    context,
     top_k: args.top_k ?? 8,
     privateCorpusPath,
   };
@@ -181,12 +183,9 @@ export async function runAdvise(args: AdviseArgs): Promise<AdviseResult> {
     }
 
     if (patternRecord) {
-      await upsertPattern({
-        category,
-        signals: patternRecord.signals,
-        projectDir: projectRoot,
-        status: 'advised_migrate',
-      });
+      // Status-only update — must NOT re-increment occurrences (upsertPattern
+      // would bump the count a second time for the same observation).
+      await updatePatternStatus(patternRecord.id, 'advised_migrate', projectRoot);
     }
 
     return {
@@ -201,7 +200,7 @@ export async function runAdvise(args: AdviseArgs): Promise<AdviseResult> {
     };
   }
 
-  const suggestedName = `@acme/${category.replace(/-/g, '-')}`;
+  const suggestedName = `@acme/${category}`;
   const packageize_steps = defaultPackageizeSteps(category, suggestedName);
 
   if (belowThreshold) {
@@ -218,12 +217,8 @@ export async function runAdvise(args: AdviseArgs): Promise<AdviseResult> {
   }
 
   if (patternRecord) {
-    await upsertPattern({
-      category,
-      signals: patternRecord.signals,
-      projectDir: projectRoot,
-      status: 'advised_packageize',
-    });
+    // Status-only update — see the migrate branch: avoid double-counting.
+    await updatePatternStatus(patternRecord.id, 'advised_packageize', projectRoot);
   }
 
   return {
