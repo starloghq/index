@@ -48,6 +48,11 @@ interface FactsReport {
   };
   false_positives: Array<{ id: string; query: string; expected: null; got: string }>;
   misses: Array<{ id: string; query: string; expected: string; got: string | null }>;
+  search_scope: {
+    total: number;
+    facts_silent: number;
+    facts_resolved: Array<{ id: string; query: string; got: string }>;
+  };
   [key: string]: unknown;
 }
 
@@ -118,6 +123,21 @@ function printScorecard(report: FactsReport): void {
       console.log(`  - ${m.id}  "${m.query}"  expected=${m.expected} got=${m.got}`);
   }
   console.log('');
+
+  // Search-scope: reported on its own, NOT folded into the headline metrics.
+  // facts SHOULD stay silent on these (they are starlog_search's job).
+  const ss = report.search_scope;
+  if (ss) {
+    console.log(
+      `search-scope (excluded from headline metrics): ${ss.facts_silent}/${ss.total} correctly silent`,
+    );
+    if (ss.facts_resolved.length > 0) {
+      console.log('  ⚠ facts FABRICATED on search-scope queries (should be silent):');
+      for (const r of [...ss.facts_resolved].sort(byId))
+        console.log(`  ! ${r.id}  "${r.query}"  got=${r.got}`);
+    }
+    console.log('');
+  }
 }
 
 function loadBaseline(): FactsReport | null {
@@ -174,6 +194,7 @@ function main(): void {
   const baselineKnown = new Set<string>([
     ...(baseline.false_positives ?? []).map((fp) => fp.id),
     ...(baseline.misses ?? []).map((m) => m.id),
+    ...(baseline.search_scope?.facts_resolved ?? []).map((r) => r.id),
   ]);
   const newFalsePositives = report.false_positives
     .filter((fp) => !baselineKnown.has(fp.id))
@@ -183,11 +204,20 @@ function main(): void {
     .filter((m) => !baselineKnown.has(m.id))
     .map((m) => m.id)
     .sort(byId);
+  // A search-scope query the by-name path now RESOLVES (was silent) is a
+  // fabrication regression — the exact class this contract exists to prevent.
+  const newFabrications = (report.search_scope?.facts_resolved ?? [])
+    .filter((r) => !baselineKnown.has(r.id))
+    .map((r) => r.id)
+    .sort(byId);
   for (const id of newFalsePositives) {
     regressions.push(`NEW false_positive: ${id}`);
   }
   for (const id of newMisses) {
     regressions.push(`NEW miss: ${id}`);
+  }
+  for (const id of newFabrications) {
+    regressions.push(`NEW search-scope fabrication: ${id}`);
   }
 
   if (regressions.length > 0) {

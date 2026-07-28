@@ -21,14 +21,16 @@ import { scoreFacts } from './score.js';
 // dataset.ts (a type cannot be enumerated at runtime).
 const VALID_KINDS: ReadonlySet<EvalKind> = new Set<EvalKind>([
   'true-positive',
-  'fuzzy-positive',
+  'search-scope',
   'hard-negative',
   'out-of-corpus',
   'robustness',
 ]);
 
-// The ONLY 11 corpus packages we have facts on, per dataset.ts's header
-// (insertion order preserved for readability; membership is what matters).
+// The 11 L1 packages every POSITIVE `expected` must belong to. NOTE: the full
+// facts corpus is larger (L2 adds axios, express, lodash, … ~45 total) — this set
+// is just the L1 subject packages the positive eval cases assert against, and the
+// test below guards that no positive points outside it. (Not the whole corpus.)
 const CORPUS_PACKAGES: ReadonlySet<string> = new Set<string>([
   'xz-utils',
   'event-stream',

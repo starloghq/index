@@ -16,7 +16,12 @@ import { EVAL_CASES, type EvalCase } from './dataset.js';
 import { lookupFacts } from '../facts.js';
 
 export const SCOPE_NOTE =
-  'Measures RETRIEVAL correctness of lookupFacts only — NOT whether facts change an agent\'s decision (that is the $-gated LLM decision-flip eval in starlogdev).';
+  'Measures RETRIEVAL correctness of lookupFacts only — NOT whether facts change an agent\'s decision (that is the $-gated LLM decision-flip eval in starlogdev). ' +
+  'facts is EXACT by-name (normalized lowercase+trim); free-text/fuzzy resolution is starlog_search\'s job. ' +
+  '"search-scope" cases (NL/fuzzy/surface-form queries) are reported in their own bucket and EXCLUDED from hit_recall / positive_precision / hard_negative_fp_rate — for those, facts staying silent (null) is the CORRECT behavior.';
+
+/** Cases whose correct facts answer is "defer to search" — scored separately. */
+const SEARCH_SCOPE_KIND = 'search-scope';
 
 /** A negative is a case whose CORRECT answer is "no match" (expected === null). */
 function isPositive(c: EvalCase): boolean {
@@ -52,6 +57,17 @@ export interface FactsReport {
   };
   false_positives: Array<{ id: string; query: string; expected: null; got: string }>;
   misses: Array<{ id: string; query: string; expected: string; got: string | null }>;
+  /**
+   * Search-scope cases, scored on their OWN terms and excluded from the headline
+   * metrics above. Facts SHOULD stay silent on these (they are search's job), so
+   * `facts_silent` is the correct-behavior count and `facts_resolved` lists any
+   * case where the by-name path fabricated an answer (a real regression to watch).
+   */
+  search_scope: {
+    total: number;
+    facts_silent: number;
+    facts_resolved: Array<{ id: string; query: string; got: string }>;
+  };
 }
 
 /**
@@ -78,15 +94,31 @@ export function scoreFacts(cases: EvalCase[] = EVAL_CASES): FactsReport {
   const falsePositives: FactsReport['false_positives'] = [];
   const misses: FactsReport['misses'] = [];
 
+  // search-scope tally (kept OUT of the headline metrics).
+  let searchScopeTotal = 0;
+  let searchScopeSilent = 0;
+  const searchScopeResolved: FactsReport['search_scope']['facts_resolved'] = [];
+
   for (const c of cases) {
     // One lookup per case; reuse for every output below.
     const got = lookupFacts(c.query)?.package ?? null;
     const correct = got === c.expected;
 
     // by_kind: uniform reading — correct == (got === expected), both polarities.
+    // For search-scope, expected===null so "correct" == "facts stayed silent".
     const bucket = byKind[c.kind] ?? (byKind[c.kind] = { total: 0, correct: 0 });
     bucket.total += 1;
     if (correct) bucket.correct += 1;
+
+    // Search-scope is scored in its own bucket and EXCLUDED from the by-name
+    // contract's headline metrics (recall/precision/fp): resolving a NL/fuzzy
+    // query would be fabrication, so silence is correct and not a "miss".
+    if (c.kind === SEARCH_SCOPE_KIND) {
+      searchScopeTotal += 1;
+      if (got === null) searchScopeSilent += 1;
+      else searchScopeResolved.push({ id: c.id, query: c.query, got });
+      continue;
+    }
 
     if (got !== null) {
       predicted += 1;
@@ -112,6 +144,7 @@ export function scoreFacts(cases: EvalCase[] = EVAL_CASES): FactsReport {
 
   falsePositives.sort(byId);
   misses.sort(byId);
+  searchScopeResolved.sort(byId);
 
   // Rebuild by_kind with sorted keys so object key order is input-independent.
   const sortedByKind: Record<string, { total: number; correct: number }> = {};
@@ -133,5 +166,10 @@ export function scoreFacts(cases: EvalCase[] = EVAL_CASES): FactsReport {
     },
     false_positives: falsePositives,
     misses,
+    search_scope: {
+      total: searchScopeTotal,
+      facts_silent: searchScopeSilent,
+      facts_resolved: searchScopeResolved,
+    },
   };
 }

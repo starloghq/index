@@ -23,7 +23,7 @@
 
 export type EvalKind =
   | 'true-positive'
-  | 'fuzzy-positive'
+  | 'search-scope'
   | 'hard-negative'
   | 'out-of-corpus'
   | 'robustness';
@@ -119,19 +119,22 @@ export const EVAL_CASES: EvalCase[] = [
     rationale: 'Exact corpus key (CVE-2024-3094 backdoor). q===p.',
   },
 
-  // ---- fuzzy-positive: case / whitespace / abbreviation / sentence variants ----
+  // ---- true-positive (normalization): case/whitespace variants that reduce to an
+  // exact corpus key under the matcher's lowercase()+trim(). That normalization is
+  // the ONLY tolerance the by-name facts path offers, so these belong with the
+  // true-positives (they resolve, and should). ----
   {
     id: 'fp-chalk-upper',
     query: 'CHALK',
     expected: 'chalk',
-    kind: 'fuzzy-positive',
+    kind: 'true-positive',
     rationale: 'Case variant; toLowerCase => "chalk" === "chalk".',
   },
   {
     id: 'fp-chalk-trim-upper',
     query: '  CHALK  ',
     expected: 'chalk',
-    kind: 'fuzzy-positive',
+    kind: 'true-positive',
     rationale:
       'Leading/trailing whitespace + uppercase; toLowerCase().trim() => "chalk".',
   },
@@ -139,137 +142,152 @@ export const EVAL_CASES: EvalCase[] = [
     id: 'fp-colors-titlecase',
     query: 'Colors',
     expected: 'colors',
-    kind: 'fuzzy-positive',
+    kind: 'true-positive',
     rationale: 'Case variant of exact key "colors"; toLowerCase normalizes.',
   },
   {
     id: 'fp-moment-trim',
     query: '  moment  ',
     expected: 'moment',
-    kind: 'fuzzy-positive',
+    kind: 'true-positive',
     rationale: 'Whitespace padding; trim() reduces to exact "moment".',
   },
   {
     id: 'fp-event-stream-trim-case',
     query: '  Event-Stream  ',
     expected: 'event-stream',
-    kind: 'fuzzy-positive',
+    kind: 'true-positive',
     rationale: 'Whitespace + mixed case; trim()+toLowerCase() => exact match.',
   },
+
+  // ---- search-scope: NL / fuzzy / surface-form queries. Facts is an EXACT by-name
+  // vetting lookup (`starlog_facts` takes a `package`); free-text / fuzzy resolution
+  // is `starlog_search`'s job. So the CORRECT facts answer for these is null
+  // (expected: null) — resolving them would fabricate an authoritative answer about
+  // a GUESSED package, the fabrication class deliberately closed by commit 7f15673
+  // (e.g. "express rate limit" -> express). The intended package is named in each
+  // rationale for reference. The scorer tallies these in their OWN bucket and
+  // EXCLUDES them from hit_recall / positive_precision / hard_negative_fp_rate, so
+  // the by-name contract's headline numbers stay honest and un-gamed. ----
   {
     id: 'fp-npm-i-moment',
     query: 'npm i moment',
-    expected: 'moment',
-    kind: 'fuzzy-positive',
-    rationale: 'Install-command shape; q.includes("moment"), unambiguous.',
+    expected: null,
+    kind: 'search-scope',
+    rationale:
+      'Install-command surface form (-> moment). The PostToolUse hook extracts the bare name before calling facts; the by-name path itself matches exact keys only, so null is correct here.',
   },
   {
     id: 'fp-moment-version',
     query: 'moment@2',
-    expected: 'moment',
-    kind: 'fuzzy-positive',
-    rationale: 'Version-suffixed name; clearly the moment package at v2.',
+    expected: null,
+    kind: 'search-scope',
+    rationale:
+      'Version-suffixed surface form (-> moment). The caller strips @version; the by-name path matches exact keys only, so null is correct.',
   },
   {
     id: 'fp-moment-sentence',
     query: 'should I use moment for dates',
-    expected: 'moment',
-    kind: 'fuzzy-positive',
-    rationale: 'Sentence naming the package explicitly. q.includes("moment").',
+    expected: null,
+    kind: 'search-scope',
+    rationale:
+      'NL question (-> moment). Capability discovery is starlog_search; the by-name facts path stays silent.',
   },
   {
     id: 'fp-moment-good-lib',
     query: 'is moment a good date library',
-    expected: 'moment',
-    kind: 'fuzzy-positive',
-    rationale: 'Phrase unambiguously about corpus "moment".',
+    expected: null,
+    kind: 'search-scope',
+    rationale:
+      'NL question (-> moment). starlog_search territory; the by-name facts path stays silent.',
   },
   {
     id: 'fp-request-sentence',
     query: 'should I still use request for HTTP in node?',
-    expected: 'request',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'Sentence unambiguously about the deprecated npm "request" HTTP client.',
+      'NL question (-> request). starlog_search territory; the by-name facts path stays silent.',
   },
   {
     id: 'fp-event-stream-safe',
     query: 'is event-stream safe?',
-    expected: 'event-stream',
-    kind: 'fuzzy-positive',
-    rationale: 'Safety question naming the exact package.',
+    expected: null,
+    kind: 'search-scope',
+    rationale:
+      'NL question that happens to embed the exact name (-> event-stream). Matching a token inside a sentence is exactly what fabricates on "express rate limit"; facts stays silent — ask by bare name.',
   },
   {
     id: 'fp-ua-parser-js-safe',
     query: 'is ua-parser-js safe to use',
-    expected: 'ua-parser-js',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'Exact corpus package embedded in a question; distinct from the ua-parser/parser traps.',
+      'NL question embedding the exact name (-> ua-parser-js). By-name path is silent; ask `starlog_facts ua-parser-js`.',
   },
   {
     id: 'fp-xz-abbrev',
     query: 'xz',
-    expected: 'xz-utils',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'Universal short name for xz-utils (the xz/liblzma project). "xz-utils".includes("xz"); same library.',
+      'Abbreviation/alias (-> xz-utils). Alias resolution is search/knowledge, not the exact by-name path.',
   },
   {
     id: 'fp-chalk-colors-order-collision',
     query: 'should I use chalk for terminal colors',
-    expected: 'chalk',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'Unambiguously ABOUT chalk. DIVERGENCE: "colors" (idx 4) substring-matches before "chalk" (idx 9), so the matcher wrongly returns colors. Correct = chalk.',
+      'NL question (-> chalk) that also names "colors" — exactly the ambiguity the by-name path refuses to guess at. Facts stays silent.',
   },
   {
     id: 'fp-chalk-stale-trap',
     query: 'is the corpus chalk entry still accurate, last_verified looks old',
-    expected: 'chalk',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'Unambiguously about chalk. Staleness is rationale-only — the matcher has no last_verified logic and must still return chalk; staleness does not flip the label to null.',
+      'NL question (-> chalk); not a bare package name. The by-name facts path stays silent.',
   },
   {
     id: 'fp-leftpad-nohyphen',
     query: 'leftpad',
-    expected: 'left-pad',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'DIVERGENCE (under-match): no hyphen, so substring fails both ways and the matcher returns null. But this IS the left-pad package; a good matcher recovers it.',
+      'Hyphen-stripped variant (-> left-pad). Fuzzy morphology is search/typo territory; exact by-name returns null.',
   },
   {
     id: 'fp-left-pad-space',
     query: 'left pad',
-    expected: 'left-pad',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'DIVERGENCE (under-match): space vs hyphen breaks substring; matcher misses. Clearly left-pad.',
+      'Spaced variant (-> left-pad). Fuzzy morphology is search territory; exact by-name returns null.',
   },
   {
     id: 'fp-datefns-nohyphen',
     query: 'datefns',
-    expected: 'date-fns',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'DIVERGENCE (under-match): hyphen-stripped form fails substring; matcher returns null. Clearly date-fns.',
+      'Hyphen-stripped variant (-> date-fns). Fuzzy morphology is search/typo territory; exact by-name returns null.',
   },
   {
     id: 'fp-event-stream-space',
     query: 'event stream library',
-    expected: 'event-stream',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'DIVERGENCE (under-match): space vs hyphen breaks "event-stream"; matcher misses. In this audit corpus the phrase points at the known package.',
+      'NL/spaced phrase (-> event-stream). Capability discovery is starlog_search; the by-name facts path stays silent.',
   },
   {
     id: 'fp-date-fns-japanese',
     query: '日付ライブラリ date-fns はどう',
-    expected: 'date-fns',
-    kind: 'fuzzy-positive',
+    expected: null,
+    kind: 'search-scope',
     rationale:
-      'Unicode (Japanese) wrapper around a CLEAN ASCII package name. q.includes("date-fns") survives mixed scripts; unambiguously date-fns.',
+      'NL (Japanese) wrapper around an exact name (-> date-fns). Not a bare package query; facts stays silent, search handles it.',
   },
 
   // ---- hard-negative: NOT in corpus but shares a substring with a corpus pkg ----
@@ -290,12 +308,12 @@ export const EVAL_CASES: EvalCase[] = [
       'Separate package built on moment. "moment-range".includes("moment") trips the matcher. Different identity -> null.',
   },
   {
-    id: 'hn-request-promise',
-    query: 'request-promise',
+    id: 'hn-express-session',
+    query: 'express-session',
     expected: null,
     kind: 'hard-negative',
     rationale:
-      'Different npm package (Bluebird wrapper). q.includes("request") wrongly returns request. -> null.',
+      'Substring trap: "express-session".includes("express") but it is a DIFFERENT package (express IS in the corpus; express-session is not) -> null. (Replaced hn-request-promise, which became a false-negative once request-promise was added to the L2 corpus.)',
   },
   {
     id: 'hn-postman-request',
@@ -501,17 +519,17 @@ export const EVAL_CASES: EvalCase[] = [
     id: 'hn-moment-vs-date-fns',
     query: 'moment vs date-fns',
     expected: null,
-    kind: 'hard-negative',
+    kind: 'search-scope',
     rationale:
-      'Comparison genuinely about BOTH packages; no single unambiguous subject. Prefer null per ambiguity rule.',
+      'NL comparison genuinely about TWO in-corpus packages (moment, date-fns) — a capability question for starlog_search, not a bare-name facts lookup. The by-name path correctly stays silent. (Re-kinded from hard-negative: both packages are in the corpus, so the "not in corpus" premise never held.)',
   },
   {
     id: 'hn-moment-or-date-fns',
     query: 'should I use moment or date-fns for dates',
     expected: null,
-    kind: 'hard-negative',
+    kind: 'search-scope',
     rationale:
-      'Names TWO corpus packages; matcher binds whichever is first in insertion order. Ambiguous -> null.',
+      'NL question comparing TWO in-corpus packages (moment, date-fns) — starlog_search territory, not a bare-name facts lookup. The by-name path correctly stays silent. (Re-kinded from hard-negative for the same reason as hn-moment-vs-date-fns.)',
   },
   {
     id: 'hn-scoped-acme-colors',
@@ -572,26 +590,28 @@ export const EVAL_CASES: EvalCase[] = [
 
   // ---- out-of-corpus: NOT in corpus, no substring relation (easy null) ----
   {
-    id: 'oc-express',
-    query: 'express',
+    id: 'oc-react',
+    query: 'react',
     expected: null,
     kind: 'out-of-corpus',
-    rationale: 'Popular package, no substring overlap with any corpus name. -> null.',
+    rationale:
+      'Popular package, genuinely not in the corpus, no substring overlap with any corpus name. -> null. (Replaced oc-express once express was added to the L2 corpus.)',
   },
   {
     id: 'oc-lodash-sentence',
     query: 'is lodash safe to use?',
     expected: null,
-    kind: 'out-of-corpus',
+    kind: 'search-scope',
     rationale:
-      'Safety question about a non-corpus package with no substring relation. -> null.',
+      'NL safety question (-> lodash, which IS in the L2 corpus). Not a bare package name, so the by-name facts path correctly stays silent; ask `starlog_facts lodash`. (Re-kinded from out-of-corpus once lodash was added.)',
   },
   {
-    id: 'oc-axios',
-    query: 'axios',
+    id: 'oc-webpack',
+    query: 'webpack',
     expected: null,
     kind: 'out-of-corpus',
-    rationale: 'Popular HTTP client; no substring overlap with any corpus key. -> null.',
+    rationale:
+      'Popular build tool, genuinely not in the corpus, no substring overlap with any corpus key. -> null. (Replaced oc-axios once axios was added to the L2 corpus.)',
   },
   {
     id: 'oc-colorette',
