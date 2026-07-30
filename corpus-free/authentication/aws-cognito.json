@@ -1,0 +1,55 @@
+{
+  "id": "aws-cognito",
+  "name": "Amazon Cognito (AWS SDK v3)",
+  "repo": "aws/aws-sdk-js-v3",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides the AWS SDK v3 client for Amazon Cognito User Pools (`@aws-sdk/client-cognito-identity-provider`) \u2014 managed sign-up/sign-in, MFA, and federated IdP operations callable from Node.js backends in the AWS ecosystem.",
+  "stack_affinity": [
+    "node",
+    "aws-lambda",
+    "express",
+    "nest.js",
+    "next.js"
+  ],
+  "integration_effort": "significant",
+  "best_for": [
+    "AWS-centric backends that administer Cognito User Pools via the official SDK v3 client",
+    "Lambda and API Gateway stacks that need Cognito Admin* and auth APIs under IAM",
+    "Enterprises standardized on Cognito user pools for compliance and AWS Organizations controls",
+    "Services that federate enterprise IdPs into Cognito-backed APIs",
+    "Teams that prefer pay-as-you-go AWS identity over a separate auth SaaS vendor"
+  ],
+  "skip_when": [
+    "You want pre-built auth UI and user-admin dashboards without building Cognito Hosted UI or custom screens",
+    "You are not on AWS and do not want Cognito/IAM coupling",
+    "You need the simplest Next.js auth setup \u2014 Cognito pool config, app clients, and SDK surface area are heavy",
+    "You prefer open-source self-hosted Auth.js or Better Auth on your own database",
+    "You primarily need browser/mobile Amplify Auth helpers rather than the low-level Identity Provider client"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "auth0",
+    "clerk",
+    "nextauth",
+    "better-auth",
+    "firebase-auth",
+    "supabase-auth",
+    "workos",
+    "custom-authentication"
+  ],
+  "health": {
+    "stars": 3648,
+    "weekly_downloads": 3541272,
+    "last_commit": "2026-07-29T20:42:17Z",
+    "contributors": 169,
+    "license": "Apache-2.0",
+    "open_issues": 140
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

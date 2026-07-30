@@ -1,0 +1,53 @@
+{
+  "id": "mongoose",
+  "name": "Mongoose",
+  "repo": "Automattic/mongoose",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides elegant MongoDB object modeling for Node.js with schemas, validation, middleware, population, and TypeScript support \u2014 the standard ODM for MongoDB in the Node ecosystem.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "nest.js",
+    "mongodb",
+    "typescript"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Node apps using MongoDB that want schemas, validation, and middleware",
+    "Express/NestJS services standardized on Mongoose models",
+    "Teams that need population, discriminators, and plugin ecosystems",
+    "Rapid API development against document collections",
+    "TypeScript projects using Mongoose's type inference helpers"
+  ],
+  "skip_when": [
+    "Your database is relational (Postgres/MySQL) \u2014 use Prisma/Drizzle/Kysely/TypeORM",
+    "You want a raw MongoDB driver without ODM overhead",
+    "You need SQL migrations and relational joins as first-class features",
+    "Edge runtimes cannot embed the Mongoose/driver stack comfortably",
+    "You prefer Prisma's MongoDB support for schema-first multi-DB consistency"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "prisma",
+    "drizzle",
+    "typeorm",
+    "sequelize",
+    "kysely",
+    "custom-orm"
+  ],
+  "health": {
+    "stars": 27475,
+    "weekly_downloads": 6053577,
+    "last_commit": "2026-07-29T20:32:27Z",
+    "contributors": 1062,
+    "license": "MIT",
+    "open_issues": 179
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

@@ -47,7 +47,8 @@
     "mikro-orm",
     "objection",
     "better-sqlite3",
-    "custom-orm"
+    "custom-orm",
+    "mongoose"
   ],
   "health": {
     "stars": 13880,

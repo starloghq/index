@@ -1,0 +1,57 @@
+{
+  "id": "typeorm",
+  "name": "TypeORM",
+  "repo": "typeorm/typeorm",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides a mature TypeScript/JavaScript ORM supporting Data Mapper and Active Record patterns across PostgreSQL, MySQL, MariaDB, SQLite, SQL Server, Oracle, and more, with decorators, migrations, and relation mapping.",
+  "stack_affinity": [
+    "node",
+    "nest.js",
+    "express",
+    "typescript",
+    "postgresql",
+    "mysql"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "NestJS and enterprise Node apps that prefer decorator-based entities and Data Mapper patterns",
+    "Teams needing broad multi-database ORM support including Oracle/SQL Server",
+    "Projects that want Active Record or Data Mapper flexibility in one library",
+    "Migrations and relation-heavy domain models in TypeScript",
+    "Codebases already standardized on TypeORM repositories"
+  ],
+  "skip_when": [
+    "You want SQL-first type safety with a thin query builder \u2014 prefer Kysely or Drizzle",
+    "You are MongoDB-only \u2014 use Mongoose",
+    "You want the lightest possible PG client \u2014 use postgres.js",
+    "You prefer Prisma's schema-first DX and generated client",
+    "Bundle size and decorator complexity are unacceptable for your runtime"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "prisma",
+    "drizzle",
+    "kysely",
+    "sequelize",
+    "mikro-orm",
+    "knex",
+    "mongoose",
+    "postgres-js",
+    "custom-orm"
+  ],
+  "health": {
+    "stars": 36609,
+    "weekly_downloads": 4934749,
+    "last_commit": "2026-07-29T08:16:22Z",
+    "contributors": 1252,
+    "license": "MIT",
+    "open_issues": 583
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

@@ -36,8 +36,10 @@
     "clerk",
     "auth0",
     "nextauth",
+    "better-auth",
     "lucia",
     "firebase-auth",
+    "aws-cognito",
     "custom-authentication",
     "passport"
   ],

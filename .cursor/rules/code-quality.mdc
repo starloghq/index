@@ -1,0 +1,25 @@
+---
+description: Code quality rules for production changes
+globs: **/*.js,**/*.ts,**/*.tsx,**/*.py
+alwaysApply: false
+---
+
+# Code Quality
+
+- Remove dead code and unreachable branches.
+
+- Avoid redundant conditions.
+
+- Document non-obvious:
+  - design decisions
+  - tradeoffs
+  - safety constraints
+  - unusual implementation choices
+
+- Do not write comments that only repeat what the code does.
+
+- Document limitations of heuristics and static analysis.
+
+- Temporary placeholders are acceptable only if they can later become configurable.
+
+- Prefer reusable capabilities over isolated patches.

@@ -39,6 +39,7 @@
   "hosted_alternative": null,
   "alternative_ids": [
     "nextauth",
+    "better-auth",
     "auth0",
     "lucia",
     "supabase-auth",

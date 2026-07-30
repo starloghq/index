@@ -1,0 +1,53 @@
+{
+  "id": "postmark",
+  "name": "Postmark",
+  "repo": "ActiveCampaign/postmark.js",
+  "ecosystem": "npm",
+  "category": "email",
+  "solves": "Provides the official Node.js SDK for Postmark's transactional email API with templates, batches, inbound email, message streams, and delivery/bounce webhooks focused on reliable inbox delivery.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "next.js",
+    "nest.js",
+    "fastify"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Transactional email (receipts, password resets, notifications) where deliverability is the priority",
+    "Apps that want separate message streams for transactional vs broadcast mail",
+    "Teams that prefer Postmark's focused ESP over general marketing platforms",
+    "Node services needing typed templates, batch sending, and webhook event handling",
+    "Products already on ActiveCampaign/Postmark infrastructure"
+  ],
+  "skip_when": [
+    "You need a free-forever high-volume tier \u2014 Postmark is commercial after trial",
+    "You want React-first email authoring tightly coupled to Resend",
+    "You must self-host SMTP with Nodemailer and no vendor",
+    "You primarily send marketing/newsletter campaigns rather than transactional mail",
+    "You are standardized on AWS SES for cost and IAM reasons"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "resend",
+    "sendgrid",
+    "mailgun",
+    "amazon-ses",
+    "nodemailer",
+    "custom-email"
+  ],
+  "health": {
+    "stars": 360,
+    "weekly_downloads": 1209354,
+    "last_commit": "2026-07-10T14:54:10Z",
+    "contributors": 45,
+    "license": "MIT",
+    "open_issues": 18
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

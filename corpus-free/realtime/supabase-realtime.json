@@ -25,7 +25,7 @@
     "Building notification or activity feed systems triggered by Postgres row changes"
   ],
   "skip_when": [
-    "You need guaranteed message delivery — Supabase Realtime does not guarantee every message reaches every client",
+    "You need guaranteed message delivery \u2014 Supabase Realtime does not guarantee every message reaches every client",
     "Your project has no Postgres database and you only need pub/sub between clients (consider Pusher, Ably, or Socket.IO instead)",
     "You need sub-10ms ultra-low-latency messaging for gaming or trading (dedicated real-time brokers like Ably or custom WebSocket servers are better)",
     "You want a lightweight self-contained WebSocket library without an opinionated backend stack (use ws or Socket.IO)",
@@ -47,7 +47,8 @@
     "custom-realtime",
     "ws",
     "mercure",
-    "yjs"
+    "yjs",
+    "mqtt"
   ],
   "health": {
     "stars": 7568,

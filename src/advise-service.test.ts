@@ -90,7 +90,10 @@ describe('runAdvise', () => {
     expect(result.action).toBe('migrate');
     expect(result.candidates?.length).toBeGreaterThan(0);
     expect(result.rationale.toLowerCase()).toContain('migrate');
-    expect(result.candidates!.every((c) => c.relevance_score >= 70)).toBe(true);
+    // Advise safety gate uses ADVISE_MIN_RELEVANCE (50); expanded corpus returns
+    // more category peers above that floor, not only ≥70 hits.
+    expect(result.candidates!.every((c) => c.relevance_score >= 50)).toBe(true);
+    expect(result.candidates!.some((c) => c.relevance_score >= 70)).toBe(true);
   });
 
   it('returns watch below recurrence threshold', async () => {

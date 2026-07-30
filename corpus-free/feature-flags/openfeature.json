@@ -1,0 +1,55 @@
+{
+  "id": "openfeature",
+  "name": "OpenFeature",
+  "repo": "open-feature/js-sdk",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides a vendor-neutral OpenFeature SDK for Node and web so application code evaluates flags through a standard API while providers (LaunchDarkly, Unleash, flagd, and others) remain swappable behind the interface. It is an abstraction layer, not a flag product.",
+  "stack_affinity": [
+    "node",
+    "typescript",
+    "nest.js",
+    "express",
+    "browser"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Platforms that must avoid hard-wiring a single feature-flag vendor into application code",
+    "Enterprises standardizing flag evaluation behind OpenFeature providers across services",
+    "Teams mid-migration between flag vendors who need a stable application API",
+    "Organizations adopting CNCF OpenFeature as a governance requirement",
+    "Polyglot estates where OpenFeature is the common evaluation abstraction"
+  ],
+  "skip_when": [
+    "You need a flag product with an admin UI, targeting, and rollouts \u2014 pick LaunchDarkly, Unleash, GrowthBook, Flagsmith, or PostHog, then optionally wrap them with OpenFeature",
+    "You have not chosen a provider yet and just need boolean toggles \u2014 OpenFeature alone does not store or serve flags",
+    "A simple env-based toggle is enough and provider wiring is overhead",
+    "Your chosen vendor's native SDK is required for advanced features not exposed via its OpenFeature provider",
+    "You are prototyping quickly and vendor neutrality is not a near-term concern"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "launchdarkly",
+    "unleash",
+    "growthbook",
+    "flagsmith",
+    "posthog",
+    "configcat",
+    "devcycle",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 277,
+    "weekly_downloads": 5485392,
+    "last_commit": "2026-07-28T19:19:53Z",
+    "contributors": 45,
+    "license": "Apache-2.0",
+    "open_issues": 45
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

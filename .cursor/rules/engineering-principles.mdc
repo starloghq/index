@@ -1,0 +1,24 @@
+---
+description: General engineering principles for designing maintainable systems
+alwaysApply: true
+---
+
+# Engineering Principles
+
+- Design features using explicit decision trees:
+  detect → validate facts → safety gate → execute → monitor.
+
+- Separate detection, validation, decision making, and execution logic.
+
+- Do not perform disruptive actions based on a single weak signal.
+  Require recurrence, confidence scoring, or multiple supporting indicators.
+
+- Separate trusted facts from heuristics.
+  Never treat heuristic signals as authoritative without validation.
+
+- Prefer deterministic fallback chains:
+  1. exact match
+  2. category fallback
+  3. safe default
+
+- Optimize for maintainability, predictable behavior, and reviewer understanding.

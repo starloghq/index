@@ -1,0 +1,53 @@
+{
+  "id": "lru-cache",
+  "name": "In-process LRU",
+  "repo": "isaacs/node-lru-cache",
+  "ecosystem": "npm",
+  "category": "caching",
+  "solves": "Provides a high-performance least-recently-used map for a single Node.js process (npm package `lru-cache`) with TTL, size-based eviction, and fetch patterns — in-memory only, with no network backend.",
+  "stack_affinity": [
+    "node",
+    "bun",
+    "typescript"
+  ],
+  "integration_effort": "drop-in",
+  "best_for": [
+    "Memoizing hot function results inside one process where a remote store would be overkill",
+    "Libraries and CLIs that need a tiny, dependency-light LRU with TTL",
+    "Per-process data that intentionally stays local to the worker",
+    "Bounding memory with max item count or max size limits",
+    "Synchronous get/set without async network I/O"
+  ],
+  "skip_when": [
+    "You need a store visible to multiple processes or hosts — use node-redis, ioredis, or Upstash",
+    "You need disk-backed or multi-driver storage — use unstorage or Keyv",
+    "Stampede protection and distributed invalidation are requirements",
+    "You are solving multi-instance application caching — start with Redis or Upstash, not an in-process LRU",
+    "You only need a single Map with manual deletes and no eviction policy"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "node-cache",
+    "keyv",
+    "unstorage",
+    "ioredis",
+    "node-redis",
+    "cacheable",
+    "upstash-redis",
+    "custom-caching"
+  ],
+  "health": {
+    "stars": 5905,
+    "weekly_downloads": 522766726,
+    "last_commit": "2026-07-07T23:26:54Z",
+    "contributors": 60,
+    "license": "BlueOak-1.0.0",
+    "open_issues": 1
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "id": "trigger-dev",
+  "name": "Trigger.dev",
+  "repo": "triggerdotdev/trigger.dev",
+  "ecosystem": "npm",
+  "category": "background-jobs",
+  "solves": "Provides a managed platform and TypeScript SDK for background jobs, long-running tasks, and AI agent workflows with local/dev parity, automatic retries, queues, and no Redis/worker infrastructure to operate yourself.",
+  "stack_affinity": [
+    "node",
+    "next.js",
+    "express",
+    "remix",
+    "hono",
+    "typescript",
+    "ai"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "TypeScript apps needing long-running or AI-agent workflows without babysitting workers",
+    "Teams that want managed queues, observability, and retries with a great local DX",
+    "Next.js/serverless products that outgrew cron hacks but do not want Redis+BullMQ ops",
+    "Durable multi-step jobs with structured logging and dashboards",
+    "Builders who want an open SDK with a hosted execution plane"
+  ],
+  "skip_when": [
+    "You must run a fully self-hosted queue inside your own VPC with no SaaS control plane",
+    "You already standardized on BullMQ/Redis or pg-boss and do not want another platform",
+    "You need multi-language workers beyond the TypeScript-centric SDK",
+    "Budget or procurement blocks a hosted job platform",
+    "Simple in-process cron (node-cron/Bree) is enough"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "inngest",
+    "bullmq",
+    "pg-boss",
+    "temporal",
+    "graphile-worker",
+    "custom-background-jobs"
+  ],
+  "health": {
+    "stars": 15807,
+    "weekly_downloads": 719137,
+    "last_commit": "2026-07-29T16:59:47Z",
+    "contributors": 141,
+    "license": "MIT",
+    "open_issues": 417
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

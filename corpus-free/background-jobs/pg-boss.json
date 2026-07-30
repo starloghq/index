@@ -1,0 +1,58 @@
+{
+  "id": "pg-boss",
+  "name": "pg-boss",
+  "repo": "timgit/pg-boss",
+  "ecosystem": "npm",
+  "category": "background-jobs",
+  "solves": "Provides a Postgres-backed job queue for Node.js using SKIP LOCKED for safe concurrent claiming, with cron/schedules, retries, priorities, and pub/sub \u2014 without introducing Redis as infrastructure.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "nest.js",
+    "fastify",
+    "postgresql"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Node apps that already run PostgreSQL and want a reliable queue without Redis",
+    "Transactional outbox-style work where jobs must commit with business data in the same database",
+    "Cron and delayed jobs with retries, backoff, and expiration in Postgres",
+    "Teams that want operational simplicity \u2014 one datastore for app state and jobs",
+    "Moderate-throughput backends where Postgres SKIP LOCKED is sufficient"
+  ],
+  "skip_when": [
+    "You need extreme throughput or Redis-native features (streams, Lua) \u2014 use BullMQ",
+    "You are serverless-first with no long-lived worker and prefer Inngest/Trigger.dev",
+    "You want a fully managed orchestration platform with zero queue ops",
+    "Your stack is Python-first (consider other PG queues or Celery)",
+    "You need complex parent/child job DAGs \u2014 BullMQ flows or Temporal fit better"
+  ],
+  "hosted_alternative": {
+    "name": "Inngest",
+    "manifest_id": "inngest",
+    "pricing_summary": "Free tier for hobby; paid plans scale with executions and concurrency"
+  },
+  "alternative_ids": [
+    "bullmq",
+    "graphile-worker",
+    "inngest",
+    "trigger-dev",
+    "agenda",
+    "bee-queue",
+    "custom-background-jobs"
+  ],
+  "health": {
+    "stars": 3810,
+    "weekly_downloads": 1164164,
+    "last_commit": "2026-07-29T15:36:53Z",
+    "contributors": 91,
+    "license": "MIT",
+    "open_issues": 25
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

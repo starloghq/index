@@ -1,0 +1,65 @@
+{
+  "id": "nextauth",
+  "name": "Auth.js (NextAuth)",
+  "repo": "nextauthjs/next-auth",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides open-source authentication for web apps (Auth.js / NextAuth.js) with built-in OAuth providers, credentials, email magic links, JWT/database sessions, and first-class Next.js App Router and Pages Router adapters \u2014 without requiring a hosted identity vendor.",
+  "stack_affinity": [
+    "next.js",
+    "react",
+    "sveltekit",
+    "express",
+    "node",
+    "solidstart",
+    "qwik"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Next.js apps that want free, self-hosted auth with dozens of OAuth providers and no per-MAU identity bill",
+    "Teams that need JWT or database sessions with adapters for Prisma, Drizzle, or popular SQL/NoSQL stores",
+    "Projects migrating off DIY JWT/cookie auth toward a maintained, community-standard auth library",
+    "Full-stack apps that want credentials, magic-link email, and social login behind one Auth.js configuration",
+    "Open-source or budget-constrained products that cannot adopt Clerk/Auth0 pricing"
+  ],
+  "skip_when": [
+    "You want polished pre-built hosted UI components and managed user admin without building your own screens",
+    "You need enterprise SSO, SCIM, or organization/RBAC as a managed product rather than DIY on top of Auth.js",
+    "You prefer a fully managed identity platform (Clerk, Auth0, WorkOS) with SLAs and no session-store ops",
+    "Your stack is Python/Go-only with no JavaScript runtime for Auth.js",
+    "You only need a thin session cookie encryptor and do not want a full auth framework"
+  ],
+  "hosted_alternative": {
+    "name": "Clerk",
+    "manifest_id": "clerk",
+    "pricing_summary": "Free tier for small apps; paid plans scale with monthly active users and organizations"
+  },
+  "alternative_ids": [
+    "clerk",
+    "auth0",
+    "better-auth",
+    "lucia",
+    "supabase-auth",
+    "firebase-auth",
+    "aws-cognito",
+    "passport",
+    "workos",
+    "kinde",
+    "iron-session",
+    "custom-authentication"
+  ],
+  "health": {
+    "stars": 28307,
+    "weekly_downloads": 5680611,
+    "last_commit": "2026-07-22T19:42:18Z",
+    "contributors": 905,
+    "license": "ISC",
+    "open_issues": 589
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

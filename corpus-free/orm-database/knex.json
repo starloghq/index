@@ -1,0 +1,55 @@
+{
+  "id": "knex",
+  "name": "Knex.js",
+  "repo": "knex/knex",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides a batteries-included SQL query builder for Node.js with transactions, migrations, seeders, and support for PostgreSQL, MySQL, SQLite, MSSQL, and others \u2014 without imposing a full ORM model layer.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "postgresql",
+    "mysql",
+    "sqlite",
+    "typescript"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Teams that want SQL query building + migrations without an ORM identity map",
+    "Multi-dialect Node services needing portable query builder APIs",
+    "Legacy apps standardized on Knex migrations and seeds",
+    "Projects that find ORMs too heavy but want more than a raw driver",
+    "Objection.js users (Objection sits on Knex)"
+  ],
+  "skip_when": [
+    "You want end-to-end generated types from schema \u2014 Prisma/Kysely/Drizzle are stronger",
+    "You need a full ORM with relations and unit-of-work (TypeORM/Sequelize)",
+    "MongoDB is your datastore",
+    "You prefer Kysely's TypeScript-first query builder for new greenfield work",
+    "A single-database postgres.js client is enough"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "kysely",
+    "drizzle",
+    "prisma",
+    "typeorm",
+    "sequelize",
+    "postgres-js",
+    "custom-orm"
+  ],
+  "health": {
+    "stars": 20335,
+    "weekly_downloads": 4995827,
+    "last_commit": "2026-06-26T14:59:48Z",
+    "contributors": 622,
+    "license": "MIT",
+    "open_issues": 729
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "maintained"
+  }
+}
