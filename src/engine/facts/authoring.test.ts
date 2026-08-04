@@ -10,6 +10,7 @@ import {
   buildManifestFromInput,
   upsertManifestEntry,
   buildL3Rule,
+  buildDiyL3Rule,
   ruleIdFor,
   upsertPolicy,
   type AddL2Input,
@@ -248,6 +249,20 @@ describe('buildL3Rule + upsertPolicy (AUTH-03 authoring)', () => {
     const upserted = result.rules.find((r) => r.id === 'pkg-@acme/x');
     expect(upserted?.decision).toBe('deny');
     expect(upserted?.rationale).toBe('new reason');
+  });
+});
+
+describe('buildDiyL3Rule (DIY policy authoring)', () => {
+  it('builds a diy_category rule passing L3RuleSchema', () => {
+    const rule = buildDiyL3Rule('authentication', 'deny', 'use Clerk/Auth0');
+    expect(L3RuleSchema.safeParse(rule).success).toBe(true);
+    expect(rule.id).toBe('diy-authentication');
+    expect(rule.match).toEqual({ diy_category: 'authentication' });
+    expect(rule.decision).toBe('deny');
+  });
+
+  it('throws on invalid verdict', () => {
+    expect(() => buildDiyL3Rule('authentication', 'nuke')).toThrow('Invalid verdict');
   });
 });
 

@@ -23,6 +23,7 @@ import {
   upsertManifestEntry,
   buildL3Rule,
   upsertPolicy,
+  buildDiyL3Rule,
   buildPushPayload,
   discoverCheckouts,
   syncCheckouts,
@@ -415,6 +416,35 @@ facts
       } else {
         console.log(`Your coding agent applies this automatically, per-project, after \`starlog init\`.`);
         console.log(`Try it from this project: starlog facts ${pkg}`);
+      }
+    }),
+  );
+
+facts
+  .command('diy-policy <category> <verdict>')
+  .description('Set an org allow/deny/flag verdict for hand-rolled DIY code in a capability category')
+  .option('--reason <text>', 'Rationale recorded with the verdict')
+  .action(
+    action('facts diy-policy failed', async (category: string, verdict: string, opts: { reason?: string }) => {
+      const rule = buildDiyL3Rule(category, verdict, opts.reason);
+
+      const envPath = process.env.STARLOG_POLICY;
+      const path = envPath ?? DEFAULT_POLICY;
+      const existing = readJsonIfPresent(path);
+      const policy = upsertPolicy(existing as { org?: string; rules?: unknown[] } | null, rule);
+      await atomicWrite(path, JSON.stringify(policy, null, 2) + '\n');
+
+      await track(
+        'cli_facts_diy_policy',
+        { decision: rule.decision, category, default_path: !envPath },
+        { noTelemetry: noTelemetry() },
+      );
+
+      console.log(`Set DIY org verdict ${verdict.toUpperCase()} for ${category} in ${path}.`);
+      if (envPath) {
+        console.log('Your agent already reads this policy (STARLOG_POLICY).');
+      } else {
+        console.log('Your coding agent applies this automatically, per-project, after `starlog init`.');
       }
     }),
   );

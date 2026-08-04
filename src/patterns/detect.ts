@@ -24,6 +24,23 @@ export interface DetectionHit {
   signals: PatternSignal[];
 }
 
+/** Minimum confidence before the DIY PreToolUse hook emits guidance (strict). */
+export const HOOK_MIN_CONFIDENCE = 65;
+
+/** High-confidence single-file hit — advise without waiting for recurrence. */
+export const HOOK_HIGH_CONFIDENCE = 80;
+
+/** Minimum raw rule score for hook activation (path + import, not keyword-only). */
+export const HOOK_MIN_SCORE = 5;
+
+/** Recurrence count before the hook advises on weaker-but-real DIY signals. */
+export const HOOK_RECURRENCE_THRESHOLD = 3;
+
+export interface KnownLibraryHit {
+  category: KnownCategory;
+  library: string;
+}
+
 interface CategoryRule {
   category: KnownCategory;
   pathPatterns: RegExp[];
@@ -71,9 +88,19 @@ const CATEGORY_RULES: CategoryRule[] = [
   {
     category: 'realtime',
     pathPatterns: [/websocket/i, /realtime/i, /socket/i],
-    importPatterns: [/\bws\b/, /WebSocket/, /socket\.io/],
+    // Narrow ws to the package import — bare \bws\b is too broad; vetted `ws` /
+    // native WebSocket belong in knownLibPatterns so they zero the DIY score.
+    importPatterns: [/from\s+['"]ws['"]/, /require\(['"]ws['"]\)/, /WebSocket/, /socket\.io/],
     keywordPatterns: [/\bwebsocket\b/i],
-    knownLibPatterns: [/socket\.io/, /@supabase\/realtime/, /pusher-js/, /ably/],
+    knownLibPatterns: [
+      /from\s+['"]ws['"]/,
+      /require\(['"]ws['"]\)/,
+      /WebSocket/,
+      /socket\.io/,
+      /@supabase\/realtime/,
+      /pusher-js/,
+      /ably/,
+    ],
   },
   {
     category: 'background-jobs',
@@ -169,6 +196,72 @@ function scoreRule(rule: CategoryRule, relPath: string, content: string): { scor
   return { score, signals };
 }
 
+function buildHit(rule: CategoryRule, relPath: string, score: number, signals: PatternSignal[]): DetectionHit {
+  return {
+    category: rule.category,
+    confidence: Math.min(100, score * 15),
+    signals: [...signals, { kind: 'path' as const, value: relPath }],
+  };
+}
+
+/**
+ * Score a single file for DIY capability patterns. Returns the best category hit
+ * above the minimum score threshold, or null when no rule fires.
+ */
+export function scoreFile(relPath: string, content: string): DetectionHit | null {
+  let best: DetectionHit | null = null;
+
+  for (const rule of CATEGORY_RULES) {
+    const { score, signals } = scoreRule(rule, relPath, content);
+    if (score < 3) continue;
+
+    const hit = buildHit(rule, relPath, score, signals);
+    if (!best || hit.confidence > best.confidence) best = hit;
+  }
+
+  return best;
+}
+
+/**
+ * Stricter scoring for live PreToolUse hooks — requires import + path signals and
+ * a higher raw score so keyword-only or import-only mentions do not fire.
+ */
+export function scoreFileForHook(relPath: string, content: string): DetectionHit | null {
+  let best: DetectionHit | null = null;
+
+  for (const rule of CATEGORY_RULES) {
+    const { score, signals } = scoreRule(rule, relPath, content);
+    if (score < HOOK_MIN_SCORE) continue;
+
+    const hasImport = signals.some((s) => s.kind === 'import');
+    const hasPath = signals.some((s) => s.kind === 'path');
+    if (!hasImport || !hasPath) continue;
+
+    const hit = buildHit(rule, relPath, score, signals);
+    if (!best || hit.confidence > best.confidence) best = hit;
+  }
+
+  return best;
+}
+
+/**
+ * Detect when the agent is using a known vetted library for a capability category.
+ * Requires both a category-matching path and a known-library import in the file.
+ */
+export function detectKnownLibraryUse(relPath: string, content: string): KnownLibraryHit | null {
+  for (const rule of CATEGORY_RULES) {
+    const pathMatch = rule.pathPatterns.some((re) => re.test(relPath));
+    if (!pathMatch) continue;
+
+    for (const re of rule.knownLibPatterns) {
+      if (re.test(content)) {
+        return { category: rule.category, library: re.source.replace(/\\b/g, '').slice(0, 48) };
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Scan a project directory for DIY capability patterns. Returns hits above a
  * minimum confidence threshold, one per category (best score wins).
@@ -187,24 +280,12 @@ export async function scanProject(projectRoot: string): Promise<DetectionHit[]> 
       continue;
     }
     const relPath = relative(projectRoot, file);
+    const hit = scoreFile(relPath, content);
+    if (!hit) continue;
 
-    for (const rule of CATEGORY_RULES) {
-      const { score, signals } = scoreRule(rule, relPath, content);
-      if (score < 3) continue;
-
-      const hitSignals = [
-        ...signals,
-        { kind: 'path' as const, value: relPath },
-      ];
-      const confidence = Math.min(100, score * 15);
-      const prev = byCategory.get(rule.category);
-      if (!prev || confidence > prev.confidence) {
-        byCategory.set(rule.category, {
-          category: rule.category,
-          confidence,
-          signals: hitSignals,
-        });
-      }
+    const prev = byCategory.get(hit.category);
+    if (!prev || hit.confidence > prev.confidence) {
+      byCategory.set(hit.category, hit);
     }
   }
 

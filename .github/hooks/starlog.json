@@ -1,0 +1,20 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "type": "command",
+        "command": ".github/hooks/starlog-pkg-check.js",
+        "timeout": 10,
+        "matcher": "Write|Edit|MultiEdit"
+      }
+    ],
+    "PostToolUse": [
+      {
+        "type": "command",
+        "command": ".github/hooks/starlog-pkg-check.js",
+        "timeout": 10,
+        "matcher": "Bash"
+      }
+    ]
+  }
+}

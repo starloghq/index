@@ -163,6 +163,26 @@ describe('starlog facts authoring + policy + overlay robustness (e2e, spawned bi
     expect(() => readFileSync(privPath, 'utf8')).not.toThrow();
   });
 
+  it('diy-policy writes a diy_category deny rule with --reason', () => {
+    const dir = newTmpDir();
+    const polPath = join(dir, '.starlog', 'policy.json');
+
+    const setPolicy = runFactsInDir(
+      dir,
+      ['diy-policy', 'authentication', 'deny', '--reason', 'use Clerk/Auth0'],
+      { STARLOG_POLICY: polPath },
+    );
+    expect(setPolicy.status).toBe(0);
+    expect(setPolicy.stdout).toContain('Set DIY org verdict DENY for authentication');
+
+    const policy = JSON.parse(readFileSync(polPath, 'utf8')) as {
+      rules: Array<{ id: string; match: { diy_category?: string }; rationale: string }>;
+    };
+    const rule = policy.rules.find((r) => r.id === 'diy-authentication');
+    expect(rule?.match.diy_category).toBe('authentication');
+    expect(rule?.rationale).toBe('use Clerk/Auth0');
+  });
+
   // ---------------------------------------------------------------------------
   // L2 override + L3 deny compose in the machine-readable JSON the agent parses.
   // The override MERGES (license/maintenance superseded; public vuln retained).

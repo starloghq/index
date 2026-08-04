@@ -323,6 +323,29 @@ export function buildL3Rule(pkg: string, decision: string, reason?: string): L3R
   return r.data;
 }
 
+/** Stable rule id for a DIY capability category. */
+export function diyRuleIdFor(category: string): string {
+  return 'diy-' + category;
+}
+
+/**
+ * Build a schema-valid L3 rule that targets hand-rolled DIY code for a capability.
+ */
+export function buildDiyL3Rule(category: string, decision: string, reason?: string): L3Rule {
+  if (!(DECISIONS as readonly string[]).includes(decision)) {
+    throw new Error('Invalid verdict "' + decision + '" — use one of: allow, deny, flag');
+  }
+  const candidate = {
+    id: diyRuleIdFor(category),
+    decision,
+    match: { diy_category: category },
+    rationale: reason && reason.trim() ? reason : 'Set via starlog facts diy-policy.',
+  };
+  const r = L3RuleSchema.safeParse(candidate);
+  if (!r.success) throw new Error('Internal: constructed DIY L3 rule failed schema validation.');
+  return r.data;
+}
+
 /**
  * Upsert an L3 rule into the `{ org, rules }` policy file shape. The org field
  * and unrelated rules are preserved; the rule with the same id is replaced. A

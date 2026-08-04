@@ -6,6 +6,8 @@ All notable changes to `starloghq` are documented here. This project follows [se
 
 Pattern tracking and migrate-or-packageize advisories — track DIY capability code, prefer migrating to safe corpus libraries over repeating dangerous DIY, and packageize only when no safe alternative exists.
 
+- **feat(hook): proactive DIY detection** — PreToolUse `Write|Edit|MultiEdit` hook scores hand-rolled capability code, gates on confidence/recurrence, validates via `runAdvise`, surfaces candidates + facts + migration guidance via `permissionDecision: "ask"` + `permissionDecisionReason` (PreToolUse ignores `additionalContext`); denies only on org `diy_category` policy, with deny emitted before enrichment so I/O failures never fail-open. Wired for Claude Code (global), Cursor (`.cursor/hooks.json`), and VS Code Copilot (`.github/hooks/starlog.json`) using `node "/abs/path"` commands.
+- **feat(cli): `starlog facts diy-policy`** — set org allow/deny/flag for hand-rolled DIY code per capability category.
 - **feat(mcp): `starlog_advise` tool** — scans for DIY patterns or accepts an observation, searches the corpus, applies a facts-based safety gate, and returns **MIGRATE** (when Clerk/Auth0/Supabase-class alternatives exist), **PACKAGEIZE** (niche with no safe hit), or **WATCH** (below recurrence threshold).
 - **feat(cli): `starlog advise`, `starlog patterns scan|list`, `starlog advise packageize`** — CLI parity with bundled playbooks and private corpus/facts scaffolding for packageize paths.
 - **feat(patterns): project + global `.starlog/patterns.json` store** — heuristic scanners for the 7 indexed categories; recurrence threshold before advising action.
@@ -60,15 +62,18 @@ Product analytics for the surface that matters. The MCP tools (`starlog_facts`, 
 Onboard a whole org without hand-authoring a fact per repo. The new `starlog org sync` walks a directory of internal checkouts and **derives** their facts locally — so your AI agent can vet *and* discover your private packages, not just public ones.
 
 ### Added
+
 - **`starlog org sync <dir>`.** Scans immediate subdirectories that are published packages (npm `package.json` **and** Python `pyproject.toml`/PEP 621) and derives, per package: an **L2 facts overlay** (`.starlog/private-facts.json`) with license + `license_risk`, maintenance from git last-commit recency, `attestation.source: "analyzer"` and a dated `fetched_at`; a **discovery corpus** (`.starlog/private-corpus.json`) from each manifest's description + keywords, so `starlog_search` surfaces internal packages by capability; and **suggested L3 policy** (`.starlog/policy.suggested.json`) — flag candidates from the signals, written to a separate proposal file the agent does **not** read (propose-not-apply; a human adopts them). Source never leaves the machine; `--facts-out` / `--corpus-out` / `--policy-out` / `--no-git` available. Repos with no published name (or no description) are reported, never fabricated.
 - **LICENSE-file license detection.** When a manifest declares no license, the license is detected from the repo's `LICENSE`/`COPYING` file (GPL/LGPL/AGPL version-aware, Apache/MIT/MPL/ISC/BSD); unrecognized → `unknown` (never a false `none`).
 - **`analyzer` attestation source.** `@starloghq/facts-schema` gains `'analyzer'` as an L2 `attestation.source`, so clone-derived facts carry honest provenance instead of masquerading as hand-authored. (schema 0.1.0 → 0.2.0)
 - Auto-generated discovery manifests are now labelled `auto_generated: true`, distinguishing them from hand-authored `corpus add` entries.
 
 ### Changed
+
 - **README:** the global-install section no longer over-promises "always on your PATH" — it now notes the `command not found` (PATH) and `EACCES` cases and points to the always-works `npx` path.
 
 ### Internal
+
 - Single L2 construction seam (`assembleL2`) shared by the hand and analyzer paths, replacing a near-duplicate builder.
 
 ## 0.4.0
@@ -76,11 +81,13 @@ Onboard a whole org without hand-authoring a fact per repo. The new `starlog org
 First-real-user fixes: a tester ran `npm i starloghq` and drove the CLI through their agent **without ever running `starlog init`**, so the MCP tools were never registered (the agent fell back to shelling the CLI), and they judged the tool on a mainstream public stack where most vetting honestly returns *"no facts on file."* These changes close the install-≠-wired gap and turn the two dead-end messages into pointers — without overclaiming public-package coverage (the value remains private/internal packages + post-cutoff advisories).
 
 ### Added
+
 - **Post-install nudge.** `npm i starloghq` now prints one line — *"run `npx starlog init` to wire your AI agent — install alone does nothing"* — because install registers no MCP server or hook on its own. Stays silent in CI / non-interactive / piped installs and never fails the install. (P0)
 - **CLI self-heal nudge.** When `starlog search` / `starlog facts` runs but `~/.claude/settings.json` exists *without* a `starlog` MCP server (a confirmed agent user who skipped `init`), a single stderr line points at `starlog init`. Conservative by design: silent when settings.json is absent/invalid (ambiguous) and suppressible with `STARLOG_NO_NUDGE`. (P0)
 - **Anonymous key↔issuance link (opt-out aware).** Keyed `facts` API requests now relay an anonymous CLI id (`X-Starlog-Anon-Id`) so the server can associate a key with its issuance. The header is omitted entirely under `DO_NOT_TRACK` / `STARLOG_TELEMETRY=0` / CI / tests, and never carries queries, file paths, or package names.
 
 ### Changed
+
 - **"No facts on file" now converts instead of dead-ending.** The miss message explains that a blank for a *mainstream public* package is expected (your model already knows it; Starlog's edge is post-cutoff advisories + your private packages), points to `npm audit`/OSV for mainstream vetting, and shows the one-liner to teach Starlog an internal package. Shared by the CLI and the `starlog_facts` MCP tool. (P1)
 - **"No strong match" search result names the scope.** Both the CLI and `starlog_search` now state that discovery covers JS/TS capabilities, and that a non-JS/TS stack has no candidates to surface — while `starlog facts <pkg>` still vets any package by name and `starlog corpus add` makes internal packages discoverable. (P2)
 
@@ -89,14 +96,17 @@ First-real-user fixes: a tester ran `npm i starloghq` and drove the CLI through 
 The **private/internal-package** flow is now first-class: an org makes its internal package both *discoverable* and *vettable* in two commands, and the agent picks it up automatically per-project. Plus a class of trust-breaking fact mis-attribution is fixed.
 
 ### Fixed
+
 - **Facts vetting resolves package names exactly — no more fabricated facts.** Previously a scoped or hyphenated name could fuzzy-/substring-match and return a *different* package's facts as authoritative (e.g. `@your-scope/pkg` → `q`, `express-rate-limit` → `express`). Resolution is now exact (normalized); an unknown name returns an honest *"no facts on file."* Natural-language *discovery* stays in `starlog_search`, where it belongs. (#7, #9)
 
 ### Added
+
 - **`starlog corpus add <pkg> --solves "…"`** — make an internal/private package **discoverable** in one command: `starlog_search` surfaces it (private-first) for a matching capability. Defaults the public-signal fields that don't apply to internal packages, so there's no manifest to hand-write. (#11)
 - **`starlog init` wires per-project private overlays into the agent.** The MCP server entry now carries `${CLAUDE_PROJECT_DIR}/.starlog/{private-facts,private-corpus,policy}.json`, so private vetting + discovery work **automatically in each project** — no shell `export` (which never reached the agent-spawned server). One global entry, resolved per-project, no cross-project leak. (#13)
 - **`starlog doctor` reports the private setup** — whether overlays are wired into the agent (warns to re-run `init` on a pre-wiring install) and what the current project has authored (`vetting N, discovery N, policy N`), flagging an invalid overlay file instead of ignoring it. (#14)
 
 ### Changed
+
 - `facts add` / `corpus add` guidance now describes the agent path accurately (overlays are auto-read per-project after `init`; the inline-env form is for CLI use) instead of suggesting a shell `export` that the agent never sees. README documents the two-command internal-package on-ramp. (#15)
 
 ## 0.2.0
