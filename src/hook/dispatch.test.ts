@@ -1,0 +1,145 @@
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { runHook, dispatchRaw } from './dispatch.js';
+import { RECURRENCE_THRESHOLD } from '../patterns/schema.js';
+
+// Isolate HOME so upsertPattern's global ~/.starlog/patterns.json write never
+// touches the real store, and each test gets a fresh recurrence counter.
+const originalHome = process.env.HOME;
+
+describe('hook dispatch', () => {
+  let cwd: string;
+  let home: string;
+
+  beforeEach(() => {
+    home = mkdtempSync(join(tmpdir(), 'starlog-hook-home-'));
+    cwd = mkdtempSync(join(tmpdir(), 'starlog-hook-cwd-'));
+    mkdirSync(join(cwd, '.starlog'), { recursive: true });
+    process.env.HOME = home;
+  });
+
+  afterEach(() => {
+    process.env.HOME = originalHome;
+    rmSync(home, { recursive: true, force: true });
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  const jwtFile = {
+    path: 'src/auth.ts',
+    content: `import jwt from 'jsonwebtoken';
+export const signToken = (id: string) => jwt.sign({ sub: id }, process.env.JWT_SECRET!);`,
+  };
+
+  it('fails open on malformed input', async () => {
+    expect(await dispatchRaw('not json')).toEqual({ decision: 'allow', source: 'starlog' });
+    expect(await dispatchRaw('')).toEqual({ decision: 'allow', source: 'starlog' });
+    expect(await dispatchRaw('   ')).toEqual({ decision: 'allow', source: 'starlog' });
+    expect(await dispatchRaw('[1,2,3]')).toEqual({ decision: 'allow', source: 'starlog' }); // valid JSON, wrong shape
+  });
+
+  it('takes the event from the stdin body when no override is given', async () => {
+    const raw = JSON.stringify({ event: 'after_file_edit', cwd, payload: { path: 'x.md', content: 'hi' } });
+    const r = await dispatchRaw(raw);
+    expect(r.decision).toBe('allow'); // dispatched, just not a capability file
+  });
+
+  it('allows valid JSON that carries no event and no override', async () => {
+    const r = await dispatchRaw(JSON.stringify({ cwd, payload: { path: 'a.ts', content: 'x' } }));
+    expect(r).toEqual({ decision: 'allow', source: 'starlog' });
+  });
+
+  it('never throws on hostile payload field types', async () => {
+    const hostile = [
+      { path: 123, content: 'x' },
+      { path: 'a.ts', content: { nested: true } },
+      { path: null, content: null },
+      { path: 'a.ts' }, // content missing
+      { content: 'x' }, // path missing
+      {},
+      undefined,
+    ];
+    for (const payload of hostile) {
+      const r = await runHook({ event: 'after_file_edit', cwd, payload: payload as never });
+      expect(r.decision).toBe('allow');
+    }
+  });
+
+  it('allows unknown / not-yet-implemented events', async () => {
+    for (const event of ['before_execution', 'prompt_submit', 'stop', 'bogus'] as const) {
+      const r = await runHook({ event: event as never, cwd });
+      expect(r.decision).toBe('allow');
+    }
+  });
+
+  it('takes the event from the CLI override when stdin omits it', async () => {
+    const raw = JSON.stringify({ cwd, payload: { path: 'README.md', content: 'hello' } });
+    const r = await dispatchRaw(raw, 'after_file_edit');
+    expect(r.decision).toBe('allow'); // README is not a tracked capability
+  });
+
+  it('stays silent (allow) for a non-capability edit', async () => {
+    const r = await runHook({
+      event: 'after_file_edit',
+      cwd,
+      payload: { path: 'src/util.ts', content: 'export const add = (a, b) => a + b;' },
+    });
+    expect(r.decision).toBe('allow');
+    expect(r.message).toBeUndefined();
+  });
+
+  it('warns exactly once at the recurrence threshold for DIY capability code', async () => {
+    // Below threshold → silent.
+    const first = await runHook({ event: 'after_file_edit', cwd, payload: jwtFile });
+    expect(first.decision).toBe('allow');
+
+    // Crossing threshold → one warn pointing at starlog_advise.
+    let warned = first;
+    for (let i = 1; i < RECURRENCE_THRESHOLD; i++) {
+      warned = await runHook({ event: 'after_file_edit', cwd, payload: jwtFile });
+    }
+    expect(warned.decision).toBe('warn');
+    expect(warned.message).toContain('authentication');
+    expect(warned.message).toContain('starlog_advise');
+
+    // Above threshold → quiet again (no nagging).
+    const after = await runHook({ event: 'after_file_edit', cwd, payload: jwtFile });
+    expect(after.decision).toBe('allow');
+  });
+
+  it('never returns deny (warn-only until opt-in)', async () => {
+    const r = await runHook({ event: 'after_file_edit', cwd, payload: jwtFile });
+    expect(r.decision).not.toBe('deny');
+  });
+
+  it('tracks distinct capability categories on independent counters', async () => {
+    const cacheFile = {
+      path: 'src/cache.ts',
+      content: 'export function createCache() { const store = new Map(); return store; }',
+    };
+    // One auth edit + one cache edit: each at count 1, both below threshold.
+    expect((await runHook({ event: 'after_file_edit', cwd, payload: jwtFile })).decision).toBe('allow');
+    expect((await runHook({ event: 'after_file_edit', cwd, payload: cacheFile })).decision).toBe('allow');
+    // A second auth edit crosses auth's threshold — and the message is auth,
+    // proving the cache edit didn't bump the auth counter.
+    const warned = await runHook({ event: 'after_file_edit', cwd, payload: jwtFile });
+    expect(warned.decision).toBe('warn');
+    expect(warned.message).toContain('authentication');
+    expect(warned.message).not.toContain('caching');
+  });
+
+  it('accumulates the same pattern across different projects (shared global store)', async () => {
+    const otherCwd = mkdtempSync(join(tmpdir(), 'starlog-hook-cwd2-'));
+    mkdirSync(join(otherCwd, '.starlog'), { recursive: true });
+    try {
+      // First occurrence in project A → silent.
+      expect((await runHook({ event: 'after_file_edit', cwd, payload: jwtFile })).decision).toBe('allow');
+      // Same DIY pattern, different project B, same HOME → global counter hits 2 → warn.
+      const warned = await runHook({ event: 'after_file_edit', cwd: otherCwd, payload: jwtFile });
+      expect(warned.decision).toBe('warn');
+    } finally {
+      rmSync(otherCwd, { recursive: true, force: true });
+    }
+  });
+});

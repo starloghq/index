@@ -15,6 +15,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { getPackageRoot } from './paths.js';
+import { runHook } from './hook/dispatch.js';
 
 const CORPUS_DIR = path.join(getPackageRoot(), 'corpus-free');
 const L2_FACTS_PATH = path.join(CORPUS_DIR, 'l2-facts.json');
@@ -211,17 +212,67 @@ function handlePayload(input: string): void {
   }
 }
 
-/** Read the PostToolUse payload from stdin and process it. Never throws; always
- *  exits 0 so the hook can never block a tool call. */
+// ── File-edit tripwire (after_file_edit) ───────────────────────────────────
+//
+// Claude Code has no literal `after_file_edit` event — a PostToolUse hook on the
+// Edit/Write/MultiEdit tools IS that event. `starlog init` registers this shim
+// under an `Edit|Write|MultiEdit` matcher; the payload is translated into the
+// portable dispatcher envelope and any warn is re-emitted in Claude's native
+// hookSpecificOutput shape. This is the Claude-Code half of the cross-platform
+// hook contract (the Go/Hookshot shim owns the same mapping for other hosts).
+const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit']);
+
+// Extract { path, content } from Claude's edit tool_input. Write carries the
+// full `content`; Edit carries `new_string` (the added code — enough for the
+// regex tripwire); MultiEdit carries an `edits[]` array of new_strings.
+function editPayload(toolInput: any): { path: string; content: string } | null {
+  const filePath = toolInput?.file_path;
+  if (typeof filePath !== 'string' || !filePath) return null;
+  let content = '';
+  if (typeof toolInput.content === 'string') content = toolInput.content;
+  else if (typeof toolInput.new_string === 'string') content = toolInput.new_string;
+  else if (Array.isArray(toolInput.edits)) {
+    content = toolInput.edits
+      .map((e: any) => (typeof e?.new_string === 'string' ? e.new_string : ''))
+      .join('\n');
+  }
+  return { path: filePath, content };
+}
+
+async function handleEdit(data: any): Promise<void> {
+  const ep = editPayload(data.tool_input || {});
+  if (!ep) return;
+  const result = await runHook({
+    event: 'after_file_edit',
+    cwd: data.cwd || process.cwd(),
+    payload: { path: ep.path, content: ep.content },
+  });
+  if (result.decision !== 'allow' && result.message) {
+    console.log(
+      JSON.stringify({
+        hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: result.message },
+      }),
+    );
+  }
+}
+
+/** Read the PostToolUse payload from stdin and process it. Routes by tool: edit
+ *  tools drive the DIY tripwire, everything else the install-facts path. Never
+ *  throws; always exits 0 so the hook can never block a tool call. */
 export function run(): void {
   let input = '';
   const stdinTimeout = setTimeout(() => process.exit(0), 3000);
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => (input += chunk));
-  process.stdin.on('end', () => {
+  process.stdin.on('end', async () => {
     clearTimeout(stdinTimeout);
     try {
-      handlePayload(input);
+      const data = JSON.parse(input);
+      if (EDIT_TOOLS.has(data.tool_name)) {
+        await handleEdit(data);
+      } else {
+        handlePayload(input);
+      }
     } catch {
       // Never fail — advisory only.
     }

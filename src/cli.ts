@@ -12,6 +12,7 @@ import { overlayPath } from './engine/overlay-discovery.js';
 import { runInit } from './init.js';
 import { runDoctor } from './doctor.js';
 import { startMcpServer } from './mcp.js';
+import { dispatchRaw, type HookEvent } from './hook/dispatch.js';
 import {
   buildComposeDeps,
   resolveFactView,
@@ -60,6 +61,27 @@ async function nudgeInitIfUnwired(format: string): Promise<void> {
     '\nTip: your AI agent is not wired to call Starlog automatically — run `starlog init` ' +
     '(then restart your agent) so it discovers and vets packages without being asked.',
   );
+}
+
+/** Read all of stdin as a string. Returns '' if stdin is a TTY or closes empty;
+ *  bounded by a short timeout so `starlog hook` can never hang a waiting agent. */
+function readStdin(): Promise<string> {
+  return new Promise((resolve) => {
+    if (process.stdin.isTTY) return resolve('');
+    let data = '';
+    const done = () => resolve(data);
+    const timer = setTimeout(done, 3000);
+    process.stdin.setEncoding('utf8');
+    process.stdin.on('data', (chunk) => (data += chunk));
+    process.stdin.on('end', () => {
+      clearTimeout(timer);
+      done();
+    });
+    process.stdin.on('error', () => {
+      clearTimeout(timer);
+      done();
+    });
+  });
 }
 
 /** Turn a thrown error into a concise, actionable message + non-zero exit,
@@ -754,6 +776,24 @@ advise
       },
     ),
   );
+
+program
+  .command('hook <event>')
+  .description(
+    'Run an agent-lifecycle hook: reads a { cwd, payload } JSON envelope on stdin ' +
+    'and writes a { decision, message?, source } decision on stdout. ' +
+    'Events: before_execution | after_file_edit | prompt_submit | stop. ' +
+    'Fail-open (always exits 0) so a hook can never block the agent.',
+  )
+  .action(async (event: string) => {
+    // Deliberately NOT wrapped in action()/fail() — a hook must never exit
+    // non-zero or print a stack trace into the agent's stream. dispatchRaw is
+    // itself fail-open; this handler only mirrors that guarantee.
+    const raw = await readStdin();
+    const result = await dispatchRaw(raw, event as HookEvent);
+    process.stdout.write(JSON.stringify(result) + '\n');
+    process.exit(0);
+  });
 
 program
   .command('telemetry')

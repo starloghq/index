@@ -11,6 +11,9 @@ const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json');
 const HOOKS_DIR = join(CLAUDE_DIR, 'hooks');
 const HOOK_FILENAME = 'starlog-pkg-check.js';
 const HOOK_PATH = join(HOOKS_DIR, HOOK_FILENAME);
+// PostToolUse matchers the shim is registered under: `Bash` for install-facts,
+// `Edit|Write|MultiEdit` for the DIY-capability tripwire (after_file_edit).
+const HOOK_MATCHERS = ['Bash', 'Edit|Write|MultiEdit'] as const;
 const STARLOG_MARKER = '<!-- starlog:init -->';
 const STARLOG_END_MARKER = '<!-- starlog:end -->';
 
@@ -165,29 +168,29 @@ async function installHookScript(): Promise<{ changed: boolean }> {
     hooks.PostToolUse = [];
   }
 
+  // One shim, two matchers: `Bash` drives install-facts, `Edit|Write|MultiEdit`
+  // drives the DIY-capability tripwire. The shim self-routes by tool_name.
   const hookCommand = `node "${HOOK_PATH}"`;
-  const alreadyRegistered = hooks.PostToolUse.some((entry: unknown) => {
-    const e = entry as { hooks?: Array<{ command?: string }> };
-    return e.hooks?.some(h => h.command?.includes(HOOK_FILENAME));
-  });
-
-  if (alreadyRegistered && !fileChanged) {
-    return { changed: false };
-  }
-
-  if (!alreadyRegistered) {
-    hooks.PostToolUse.push({
-      matcher: 'Bash',
-      hooks: [{
-        type: 'command',
-        command: hookCommand,
-        timeout: 10,
-      }],
+  const hasMatcher = (matcher: string): boolean =>
+    hooks.PostToolUse.some((entry: unknown) => {
+      const e = entry as { matcher?: string; hooks?: Array<{ command?: string }> };
+      return e.matcher === matcher && e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
     });
+
+  let settingsChanged = false;
+  for (const matcher of HOOK_MATCHERS) {
+    if (hasMatcher(matcher)) continue;
+    hooks.PostToolUse.push({
+      matcher,
+      hooks: [{ type: 'command', command: hookCommand, timeout: 10 }],
+    });
+    settingsChanged = true;
+  }
+  if (settingsChanged) {
     await writeSettingsJson(settings);
   }
 
-  return { changed: true };
+  return { changed: fileChanged || settingsChanged };
 }
 
 async function removeHookScript(): Promise<{ changed: boolean }> {
@@ -466,12 +469,17 @@ async function hookAction(): Promise<PlanAction> {
 
   const settings = await readSettingsJson();
   const hooks = settings.hooks as { PostToolUse?: unknown[] } | undefined;
-  const registered = Array.isArray(hooks?.PostToolUse) && hooks!.PostToolUse.some((entry) => {
-    const e = entry as { hooks?: Array<{ command?: string }> };
-    return e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
-  });
+  const list = Array.isArray(hooks?.PostToolUse) ? hooks!.PostToolUse : [];
+  // 'unchanged' only when BOTH matchers are wired — so a pre-tripwire install
+  // (Bash only) reports 'update', prompting a re-init that adds the edit hook.
+  const allRegistered = HOOK_MATCHERS.every((matcher) =>
+    list.some((entry) => {
+      const e = entry as { matcher?: string; hooks?: Array<{ command?: string }> };
+      return e.matcher === matcher && e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
+    }),
+  );
 
-  if (fileMatches && registered) return 'unchanged';
+  if (fileMatches && allRegistered) return 'unchanged';
   return existing === null ? 'create' : 'update';
 }
 

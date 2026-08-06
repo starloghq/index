@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, mkdtempSync } from 'node:fs';
+import { writeFileSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { generateHookScript } from './init.js';
@@ -22,6 +22,27 @@ function runHook(command: string): any {
   const out = execFileSync(process.execPath, [hookPath], { input, encoding: 'utf8' });
   const jsonLine = out.split('\n').find((l) => l.trim().startsWith('{'));
   return jsonLine ? JSON.parse(jsonLine) : null;
+}
+
+// Drive the shim with a Claude Code edit-tool payload (Write/Edit/MultiEdit),
+// returning every emitted advisory. Isolated HOME so the recurrence store lands
+// in a throwaway ~/.starlog. Reusing one home across calls lets the recurrence
+// counter accumulate, exactly as it would across real edits.
+function runEdit(
+  toolName: string,
+  toolInput: Record<string, unknown>,
+  env: { home: string; cwd: string },
+): string[] {
+  const input = JSON.stringify({ tool_name: toolName, tool_input: toolInput, cwd: env.cwd });
+  const out = execFileSync(process.execPath, [hookPath], {
+    input,
+    encoding: 'utf8',
+    env: { ...process.env, HOME: env.home },
+  });
+  return out
+    .split('\n')
+    .filter((l) => l.trim().startsWith('{'))
+    .map((l) => JSON.parse(l).hookSpecificOutput.additionalContext as string);
 }
 
 // Returns EVERY emitted facts message (additionalContext). HOME + cwd are
@@ -128,5 +149,55 @@ describe('versioned installs still hit the facts lookup', () => {
     expect(msgs.length).toBe(1);
     expect(msgs[0]).toContain('requests');
     expect(msgs[0]).not.toContain('==2.31.0');
+  });
+});
+
+// The shim self-routes: an Edit/Write/MultiEdit payload drives the DIY tripwire
+// (after_file_edit) instead of the install-facts path. Recurrence-gated: silent
+// below threshold, one warn at the crossing, quiet after.
+describe('edit tripwire (after_file_edit)', () => {
+  const diyAuth = `import jwt from 'jsonwebtoken';
+export const signToken = (id: string) => jwt.sign({ sub: id }, process.env.JWT_SECRET!);`;
+
+  function freshEnv() {
+    const home = mkdtempSync(join(tmpdir(), 'starlog-edit-home-'));
+    const cwd = mkdtempSync(join(tmpdir(), 'starlog-edit-cwd-'));
+    mkdirSync(join(cwd, '.starlog'), { recursive: true });
+    return { home, cwd };
+  }
+
+  it('warns once at the recurrence threshold for recurring DIY capability code', () => {
+    const env = freshEnv();
+    const input = { file_path: join(env.cwd, 'src', 'auth.ts'), content: diyAuth };
+
+    const first = runEdit('Write', input, env); // below threshold → silent
+    expect(first.length).toBe(0);
+
+    const second = runEdit('Write', input, env); // crosses threshold → warn
+    expect(second.length).toBe(1);
+    expect(second[0]).toContain('authentication');
+    expect(second[0]).toContain('starlog_advise');
+
+    const third = runEdit('Write', input, env); // above threshold → quiet
+    expect(third.length).toBe(0);
+  });
+
+  it('stays silent for a non-capability edit', () => {
+    const env = freshEnv();
+    const msgs = runEdit(
+      'Write',
+      { file_path: join(env.cwd, 'src', 'util.ts'), content: 'export const add = (a, b) => a + b;' },
+      env,
+    );
+    expect(msgs.length).toBe(0);
+  });
+
+  it('reads Edit new_string, not just Write content', () => {
+    const env = freshEnv();
+    const input = { file_path: join(env.cwd, 'src', 'auth.ts'), old_string: '', new_string: diyAuth };
+    runEdit('Edit', input, env);
+    const warned = runEdit('Edit', input, env);
+    expect(warned.length).toBe(1);
+    expect(warned[0]).toContain('authentication');
   });
 });
