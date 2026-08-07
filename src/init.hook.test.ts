@@ -288,3 +288,43 @@ export const signToken = (id) => jwt.sign({ sub: id }, process.env.JWT_SECRET);`
     expect(msgs[0]).toContain('event-stream');
   });
 });
+
+// PreToolUse (before_execution) policy gate through the real shim. A PreToolUse
+// Bash payload for a policy-denied install must emit Claude's permissionDecision
+// (ask by default, deny under STARLOG_HOOK_ENFORCE=deny); an allowed install emits
+// nothing (normal permission flow).
+describe('PreToolUse policy gate (e2e)', () => {
+  function drivePre(command: string, opts: { enforce?: boolean } = {}): any {
+    const home = mkdtempSync(join(tmpdir(), 'starlog-pre-home-'));
+    const cwd = mkdtempSync(join(tmpdir(), 'starlog-pre-cwd-'));
+    mkdirSync(join(cwd, '.starlog'), { recursive: true });
+    writeFileSync(
+      join(cwd, '.starlog', 'policy.json'),
+      JSON.stringify({ org: 'test', rules: [{ id: 'ban', decision: 'deny', match: { package: 'evil-pkg' }, rationale: 'malware' }] }),
+    );
+    const payload = JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: 'Bash', tool_input: { command }, cwd });
+    const env: Record<string, string> = { ...process.env, HOME: home };
+    delete env.STARLOG_POLICY; // let cwd resolution win
+    delete env.STARLOG_PRIVATE_FACTS;
+    if (opts.enforce) env.STARLOG_HOOK_ENFORCE = 'deny';
+    const out = execFileSync(process.execPath, [hookPath], { input: payload, encoding: 'utf8', env });
+    const line = out.split('\n').find((l) => l.trim().startsWith('{'));
+    return line ? JSON.parse(line) : null;
+  }
+
+  it('asks (does not hard-block) on a policy-denied install by default', () => {
+    const r = drivePre('npm install evil-pkg');
+    expect(r.hookSpecificOutput.hookEventName).toBe('PreToolUse');
+    expect(r.hookSpecificOutput.permissionDecision).toBe('ask');
+    expect(r.hookSpecificOutput.permissionDecisionReason).toContain('evil-pkg');
+  });
+
+  it('denies (hard block) under STARLOG_HOOK_ENFORCE=deny', () => {
+    const r = drivePre('npm install evil-pkg', { enforce: true });
+    expect(r.hookSpecificOutput.permissionDecision).toBe('deny');
+  });
+
+  it('emits nothing for an allowed install (normal permission flow)', () => {
+    expect(drivePre('npm install lodash')).toBeNull();
+  });
+});

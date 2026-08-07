@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runHook, dispatchRaw } from './dispatch.js';
@@ -102,6 +102,9 @@ export const signToken = (id: string) => jwt.sign({ sub: id }, process.env.JWT_S
     expect(warned.decision).toBe('warn');
     expect(warned.message).toContain('authentication');
     expect(warned.message).toContain('starlog_advise');
+    // Names a concrete vetted library (the eval-motivated inline hint), not just
+    // a bare "go call the tool" indirection.
+    expect(warned.message).toMatch(/Clerk|Auth0|better-auth/);
 
     // Above threshold → quiet again (no nagging).
     const after = await runHook({ event: 'after_file_edit', cwd, payload: jwtFile });
@@ -159,5 +162,64 @@ export const signToken = (id: string) => jwt.sign({ sub: id }, process.env.JWT_S
     } finally {
       rmSync(otherCwd, { recursive: true, force: true });
     }
+  });
+});
+
+describe('before_execution — L3 policy gate', () => {
+  // Clear ambient overlay env so the handler resolves policy from the temp cwd
+  // (an exported STARLOG_POLICY in the dev shell would otherwise win).
+  const savedEnv: Record<string, string | undefined> = {};
+  let cwd: string;
+
+  beforeEach(() => {
+    for (const k of ['STARLOG_POLICY', 'STARLOG_PRIVATE_FACTS', 'STARLOG_HOOK_ENFORCE']) {
+      savedEnv[k] = process.env[k];
+      delete process.env[k];
+    }
+    cwd = mkdtempSync(join(tmpdir(), 'starlog-policy-cwd-'));
+    mkdirSync(join(cwd, '.starlog'), { recursive: true });
+    // Org policy: deny evil-pkg by name.
+    writeFileSync(
+      join(cwd, '.starlog', 'policy.json'),
+      JSON.stringify({ org: 'test', rules: [{ id: 'ban-evil', decision: 'deny', match: { package: 'evil-pkg' }, rationale: 'known-malicious' }] }),
+    );
+  });
+
+  afterEach(() => {
+    for (const [k, v] of Object.entries(savedEnv)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+    rmSync(cwd, { recursive: true, force: true });
+  });
+
+  it('warns (→ ask) by default on a policy-denied install', async () => {
+    const r = await runHook({ event: 'before_execution', cwd, payload: { command: 'npm i evil-pkg' } });
+    expect(r.decision).toBe('warn');
+    expect(r.message).toContain('evil-pkg');
+    expect(r.message).toContain('known-malicious');
+  });
+
+  it('denies (→ hard block) when STARLOG_HOOK_ENFORCE=deny', async () => {
+    process.env.STARLOG_HOOK_ENFORCE = 'deny';
+    const r = await runHook({ event: 'before_execution', cwd, payload: { command: 'pnpm add evil-pkg@1.2.3' } });
+    expect(r.decision).toBe('deny');
+    expect(r.message).toContain('evil-pkg'); // version stripped, still matches
+  });
+
+  it('allows an install with no denied package', async () => {
+    const r = await runHook({ event: 'before_execution', cwd, payload: { command: 'npm i lodash' } });
+    expect(r.decision).toBe('allow');
+    expect(r.message).toBeUndefined();
+  });
+
+  it('allows a non-install command (not our gate)', async () => {
+    const r = await runHook({ event: 'before_execution', cwd, payload: { command: 'rm -rf build && ls' } });
+    expect(r.decision).toBe('allow');
+  });
+
+  it('fails open when the command is missing/garbage', async () => {
+    expect((await runHook({ event: 'before_execution', cwd, payload: {} })).decision).toBe('allow');
+    expect((await runHook({ event: 'before_execution', cwd, payload: { command: 123 } as never })).decision).toBe('allow');
   });
 });

@@ -217,24 +217,27 @@ describe('starlog init / doctor lifecycle (e2e, spawned binary)', () => {
     const init = runCli(['init', '-y'], { home, proj });
     expect(init.status).toBe(0);
 
-    const post = readSettings(home).hooks.PostToolUse as Array<{
-      matcher?: string;
-      hooks?: Array<{ command?: string }>;
-    }>;
-    const starlogEntries = post.filter((e) => e.hooks?.some((h) => h.command?.includes('starlog-pkg-check.js')));
-    const matchers = starlogEntries.map((e) => e.matcher).sort();
+    const settings = readSettings(home);
+    const post = settings.hooks.PostToolUse as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>;
+    const pre = (settings.hooks.PreToolUse ?? []) as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>;
+    const isStarlog = (e: { hooks?: Array<{ command?: string }> }) =>
+      e.hooks?.some((h) => h.command?.includes('starlog-pkg-check.js'));
+    const postMatchers = post.filter(isStarlog).map((e) => e.matcher).sort();
+    const preMatchers = pre.filter(isStarlog).map((e) => e.matcher).sort();
 
-    // Both starlog matchers now present, exactly once each (no Bash duplicate).
-    expect(matchers).toEqual(['Bash', 'Edit|Write|MultiEdit']);
+    // Both PostToolUse matchers now present, exactly once each (no Bash duplicate),
+    // AND the new PreToolUse/Bash policy gate was added.
+    expect(postMatchers).toEqual(['Bash', 'Edit|Write|MultiEdit']);
+    expect(preMatchers).toEqual(['Bash']);
     // The unrelated user hook survived untouched.
     expect(post.some((e) => e.matcher === 'Read' && e.hooks?.some((h) => h.command === 'node /somewhere/foreign-hook.js'))).toBe(true);
 
-    // A second re-init is now idempotent for the hook (no third starlog entry).
+    // A second re-init is idempotent for the hook (no duplicate starlog entries).
     const again = runCli(['init', '-y'], { home, proj });
     expect(again.status).toBe(0);
-    const after = (readSettings(home).hooks.PostToolUse as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>)
-      .filter((e) => e.hooks?.some((h) => h.command?.includes('starlog-pkg-check.js')));
-    expect(after.length).toBe(2);
+    const after = readSettings(home);
+    expect((after.hooks.PostToolUse as any[]).filter(isStarlog).length).toBe(2);
+    expect((after.hooks.PreToolUse as any[]).filter(isStarlog).length).toBe(1);
   });
 
   // ── 3. Uninstall reverses a full --all --project install + backs up markers ─

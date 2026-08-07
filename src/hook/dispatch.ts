@@ -26,6 +26,9 @@ import { relative, isAbsolute } from 'node:path';
 import { detectFile } from '../patterns/detect.js';
 import { upsertPattern } from '../patterns/store.js';
 import { RECURRENCE_THRESHOLD } from '../patterns/schema.js';
+import { parseInstallCommand } from '../patterns/install-parse.js';
+import { buildComposeDeps, lookupFactView } from '../engine/facts.js';
+import { overlayPath } from '../engine/overlay-discovery.js';
 
 export type HookEvent = 'before_execution' | 'after_file_edit' | 'prompt_submit' | 'stop';
 
@@ -47,6 +50,22 @@ export interface HookResult {
 }
 
 const ALLOW: HookResult = { decision: 'allow', source: 'starlog' };
+
+// Illustrative vetted libraries per capability, to make the nudge CONCRETE — the
+// tripwire eval (.planning/tripwire-eval.md) showed a named hint moves behavior
+// far more than a bare "go call the tool" indirection (B→C +16.7pp). These are
+// only a teaser to break the DIY anchor; the AUTHORITATIVE, safety- and
+// policy-checked recommendation still comes from starlog_advise against the live
+// corpus. Kept as flagship names (stable), not the full corpus.
+const CATEGORY_HINTS: Record<string, string> = {
+  authentication: 'Clerk, Auth0, or better-auth',
+  'feature-flags': 'LaunchDarkly, PostHog, or Flagsmith',
+  caching: 'ioredis, keyv, or Upstash Redis',
+  realtime: 'Socket.IO, Ably, or Pusher',
+  'background-jobs': 'BullMQ or Inngest',
+  email: 'Resend or SendGrid',
+  'orm-database': 'Prisma, Drizzle, or Kysely',
+};
 
 /** Payload shape for the `after_file_edit` event. */
 interface FileEditPayload {
@@ -97,13 +116,73 @@ async function handleAfterFileEdit(input: HookInput): Promise<HookResult> {
   // above so we don't nag on every subsequent edit of the same pattern.
   if (record.occurrences !== RECURRENCE_THRESHOLD) return ALLOW;
 
+  const hint = CATEGORY_HINTS[hit.category];
+  const teaser = hint
+    ? `Vetted libraries like ${hint} likely cover this. `
+    : 'A vetted library may already cover this. ';
   return {
     decision: 'warn',
     source: 'starlog',
     message:
       `[Starlog] Recurring DIY ${hit.category} detected (${record.occurrences}× across your projects). ` +
-      `A vetted library may already cover this — call starlog_advise before writing more custom ` +
-      `${hit.category} code, and starlog_facts to vet any package you reach for.`,
+      `${teaser}Call starlog_advise for a safety- and policy-checked recommendation before writing ` +
+      `more custom ${hit.category} code, and starlog_facts to vet any package you reach for.`,
+  };
+}
+
+/** Payload shape for the `before_execution` event. */
+interface CommandPayload {
+  /** The shell command the agent is about to run. */
+  command?: unknown;
+}
+
+/**
+ * `before_execution` — L3 policy gating on dependency INTRODUCTION only (Decision
+ * 3 in the plan). Parses `npm i <pkg>` / `pnpm add` / `pip install` and, for each
+ * package, checks the org's L3 policy locally (no network in a blocking pre-hook).
+ * If a package is policy-DENIED:
+ *   - default → `warn` (Claude maps to permissionDecision "ask": surface + let the
+ *     user decide — the right posture for an org rule).
+ *   - STARLOG_HOOK_ENFORCE=deny → `deny` (hard block).
+ * This is NOT general command safety — L3 rules match on package name / license /
+ * maintenance, so there is nothing to gate on for an arbitrary shell command.
+ */
+function handleBeforeExecution(input: HookInput): HookResult {
+  const payload = (input.payload ?? {}) as CommandPayload;
+  const command = typeof payload.command === 'string' ? payload.command : undefined;
+  if (!command) return ALLOW;
+
+  const parsed = parseInstallCommand(command);
+  if (!parsed || parsed.packages.length === 0) return ALLOW; // not a dependency install
+
+  // Resolve the policy/overlay paths from cwd exactly as advise does — the hook
+  // subprocess does NOT inherit the MCP server's baked STARLOG_POLICY env, so
+  // default to <cwd>/.starlog/policy.json. LOCAL-only, sync, no network.
+  const cwd = input.cwd ?? process.cwd();
+  const deps = buildComposeDeps({
+    ...process.env,
+    STARLOG_POLICY: overlayPath(process.env.STARLOG_POLICY, 'policy.json', cwd),
+    STARLOG_PRIVATE_FACTS: overlayPath(process.env.STARLOG_PRIVATE_FACTS, 'private-facts.json', cwd),
+  });
+
+  const denied: string[] = [];
+  for (const { name } of parsed.packages) {
+    const view = lookupFactView(name, deps);
+    if (view?.l3?.decision === 'deny') {
+      denied.push(`${name} (${view.l3.rationale ?? 'org policy'})`);
+    }
+  }
+  if (denied.length === 0) return ALLOW;
+
+  const enforce = process.env.STARLOG_HOOK_ENFORCE === 'deny';
+  return {
+    decision: enforce ? 'deny' : 'warn',
+    source: 'starlog',
+    message:
+      `[Starlog policy] Org policy denies: ${denied.join('; ')}. ` +
+      (enforce
+        ? 'Install blocked — use an approved alternative (starlog_search) or obtain a policy exception.'
+        : 'Confirm before installing, or use an approved alternative (starlog_search).'),
   };
 }
 
@@ -116,10 +195,10 @@ export async function runHook(input: HookInput): Promise<HookResult> {
     switch (input?.event) {
       case 'after_file_edit':
         return await handleAfterFileEdit(input);
-      // before_execution (L3 dependency gating), prompt_submit (facts context
-      // injection), and stop (verification gate) are later phases — allow for now
-      // so the contract is complete and forward-compatible.
       case 'before_execution':
+        return handleBeforeExecution(input);
+      // prompt_submit (facts context injection) and stop (verification gate) are
+      // later phases — allow for now so the contract stays forward-compatible.
       case 'prompt_submit':
       case 'stop':
         return ALLOW;
