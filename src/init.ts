@@ -11,6 +11,17 @@ const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json');
 const HOOKS_DIR = join(CLAUDE_DIR, 'hooks');
 const HOOK_FILENAME = 'starlog-pkg-check.js';
 const HOOK_PATH = join(HOOKS_DIR, HOOK_FILENAME);
+// The shim is registered under one entry per (event, matcher). It self-routes by
+// hook_event_name + tool_name:
+//   PostToolUse/Bash               → install-facts
+//   PostToolUse/Edit|Write|MultiEdit → DIY-capability tripwire (after_file_edit)
+//   PreToolUse/Bash                → L3 policy gate (before_execution)
+const HOOK_REGISTRATIONS: ReadonlyArray<{ event: 'PreToolUse' | 'PostToolUse'; matcher: string }> = [
+  { event: 'PostToolUse', matcher: 'Bash' },
+  { event: 'PostToolUse', matcher: 'Edit|Write|MultiEdit' },
+  { event: 'PreToolUse', matcher: 'Bash' },
+];
+const HOOK_EVENTS = ['PreToolUse', 'PostToolUse'] as const;
 const STARLOG_MARKER = '<!-- starlog:init -->';
 const STARLOG_END_MARKER = '<!-- starlog:end -->';
 
@@ -155,54 +166,54 @@ async function installHookScript(): Promise<{ changed: boolean }> {
     await atomicWrite(HOOK_PATH, desired);
   }
 
-  // Add hook entry to settings.json
+  // Add hook entries to settings.json — one shim, one entry per (event, matcher).
   const settings = await readSettingsJson();
   if (!settings.hooks || typeof settings.hooks !== 'object') {
     settings.hooks = {};
   }
   const hooks = settings.hooks as Record<string, unknown[]>;
-  if (!Array.isArray(hooks.PostToolUse)) {
-    hooks.PostToolUse = [];
-  }
-
   const hookCommand = `node "${HOOK_PATH}"`;
-  const alreadyRegistered = hooks.PostToolUse.some((entry: unknown) => {
-    const e = entry as { hooks?: Array<{ command?: string }> };
-    return e.hooks?.some(h => h.command?.includes(HOOK_FILENAME));
-  });
-
-  if (alreadyRegistered && !fileChanged) {
-    return { changed: false };
-  }
-
-  if (!alreadyRegistered) {
-    hooks.PostToolUse.push({
-      matcher: 'Bash',
-      hooks: [{
-        type: 'command',
-        command: hookCommand,
-        timeout: 10,
-      }],
+  const hasEntry = (event: string, matcher: string): boolean =>
+    Array.isArray(hooks[event]) &&
+    hooks[event].some((entry: unknown) => {
+      const e = entry as { matcher?: string; hooks?: Array<{ command?: string }> };
+      return e.matcher === matcher && e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
     });
+
+  let settingsChanged = false;
+  for (const { event, matcher } of HOOK_REGISTRATIONS) {
+    if (hasEntry(event, matcher)) continue;
+    if (!Array.isArray(hooks[event])) hooks[event] = [];
+    hooks[event].push({
+      matcher,
+      hooks: [{ type: 'command', command: hookCommand, timeout: 10 }],
+    });
+    settingsChanged = true;
+  }
+  if (settingsChanged) {
     await writeSettingsJson(settings);
   }
 
-  return { changed: true };
+  return { changed: fileChanged || settingsChanged };
 }
 
 async function removeHookScript(): Promise<{ changed: boolean }> {
-  // Remove hook entry from settings.json
+  // Remove every starlog shim entry across both event arrays (matched by filename,
+  // so all matchers under PreToolUse + PostToolUse are stripped).
   const settings = await readSettingsJson();
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
-  if (hooks && Array.isArray(hooks.PostToolUse)) {
-    const before = hooks.PostToolUse.length;
-    hooks.PostToolUse = hooks.PostToolUse.filter((entry: unknown) => {
-      const e = entry as { hooks?: Array<{ command?: string }> };
-      return !e.hooks?.some(h => h.command?.includes(HOOK_FILENAME));
-    });
-    if (hooks.PostToolUse.length < before) {
-      await writeSettingsJson(settings);
+  let settingsChanged = false;
+  if (hooks) {
+    for (const event of HOOK_EVENTS) {
+      if (!Array.isArray(hooks[event])) continue;
+      const before = hooks[event].length;
+      hooks[event] = hooks[event].filter((entry: unknown) => {
+        const e = entry as { hooks?: Array<{ command?: string }> };
+        return !e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
+      });
+      if (hooks[event].length < before) settingsChanged = true;
     }
+    if (settingsChanged) await writeSettingsJson(settings);
   }
 
   // Remove the hook file
@@ -465,13 +476,18 @@ async function hookAction(): Promise<PlanAction> {
   const fileMatches = existing === generateHookScript();
 
   const settings = await readSettingsJson();
-  const hooks = settings.hooks as { PostToolUse?: unknown[] } | undefined;
-  const registered = Array.isArray(hooks?.PostToolUse) && hooks!.PostToolUse.some((entry) => {
-    const e = entry as { hooks?: Array<{ command?: string }> };
-    return e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  // 'unchanged' only when EVERY (event, matcher) is wired — so an older install
+  // missing the tripwire or the policy gate reports 'update', prompting a re-init.
+  const allRegistered = HOOK_REGISTRATIONS.every(({ event, matcher }) => {
+    const list = Array.isArray(hooks?.[event]) ? hooks![event] : [];
+    return list.some((entry) => {
+      const e = entry as { matcher?: string; hooks?: Array<{ command?: string }> };
+      return e.matcher === matcher && e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME));
+    });
   });
 
-  if (fileMatches && registered) return 'unchanged';
+  if (fileMatches && allRegistered) return 'unchanged';
   return existing === null ? 'create' : 'update';
 }
 

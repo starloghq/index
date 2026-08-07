@@ -44,6 +44,7 @@
     "prepublishOnly": "npm run build",
     "search": "tsx src/cli.ts search",
     "bench:facts": "tsx scripts/bench-facts.ts",
+    "eval:tripwire": "tsx scripts/eval-tripwire.ts",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "check:versions": "node scripts/check-versions.mjs",
@@ -65,6 +66,7 @@
   "devDependencies": {
     "@types/node": "^25.9.1",
     "esbuild": "^0.28.0",
+    "fast-check": "^4.9.0",
     "tsx": "^4.22.3",
     "typescript": "^5.9.3",
     "vitest": "^4.1.7"
