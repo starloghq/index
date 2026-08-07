@@ -68,8 +68,18 @@ describe('runTripwireEval scoring math (stubbed LLM)', () => {
     expect(report.overall.A_control.adopt_rate).toBe(0);
     expect(report.overall.B_nudge.adopt_rate).toBe(1);
     expect(report.overall.C_advice.adopt_rate).toBe(1);
+    // D (ambient, no injection) echoes ARM_A → 0; E (ambient + nudge) echoes ARM_B → 1.
+    expect(report.overall.D_ambient.adopt_rate).toBe(0);
+    expect(report.overall.E_ambient_nudge.adopt_rate).toBe(1);
     expect(report.lift_A_to_B).toBe(100);
     expect(report.lift_B_to_C).toBe(0);
+    expect(report.lift_D_to_E).toBe(100);
     expect(report.byScenario).toHaveLength(2);
+  });
+
+  it('ambient arms use the ambient system prompt but the same injections as A/B', () => {
+    // D shares A's (empty) injection; E shares B's nudge — only the system prompt differs.
+    expect(buildAgentPrompt(SCENARIOS[0], 'D_ambient')).toBe(buildAgentPrompt(SCENARIOS[0], 'A_control'));
+    expect(buildAgentPrompt(SCENARIOS[0], 'E_ambient_nudge')).toBe(buildAgentPrompt(SCENARIOS[0], 'B_nudge'));
   });
 });

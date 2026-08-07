@@ -8,24 +8,45 @@
 import type { LlmFn } from '../types.js';
 import { SCENARIOS, type EvalScenario } from './scenarios.js';
 
-export type Arm = 'A_control' | 'B_nudge' | 'C_advice';
+// A/B/C use a NEUTRAL system prompt → measures the nudge vs a bare model (upper
+// bound). D/E add the AMBIENT system prompt — a stand-in for the CLAUDE.md
+// instruction Starlog already ships — so D→E measures the hook's MARGINAL value
+// over the existing pull-surface (the honest go/no-go the bare-control A/B can't give).
+export type Arm = 'A_control' | 'B_nudge' | 'C_advice' | 'D_ambient' | 'E_ambient_nudge';
 export type Decision = 'adopt_library' | 'continue_diy' | 'other';
 
 const AGENT_SYSTEM =
   'You are a pragmatic senior engineer pair-programming on a real codebase. ' +
   'Be concise. State the ONE next step you would actually take now and why, in 2-3 sentences.';
 
+// Simulates the ambient guidance `starlog init` writes into CLAUDE.md — present in
+// every real Claude Code session, hook or no hook.
+const AGENT_SYSTEM_AMBIENT =
+  AGENT_SYSTEM +
+  ' This project uses Starlog: prefer vetted, well-maintained libraries over ' +
+  'hand-rolled implementations, and consult the starlog_advise tool before building ' +
+  'custom capability code (auth, caching, queues, email, feature flags, realtime, ORM).';
+
+type Injection = 'none' | 'nudge' | 'advice';
+const ARM_SPEC: Record<Arm, { ambient: boolean; injection: Injection }> = {
+  A_control: { ambient: false, injection: 'none' },
+  B_nudge: { ambient: false, injection: 'nudge' },
+  C_advice: { ambient: false, injection: 'advice' },
+  D_ambient: { ambient: true, injection: 'none' },
+  E_ambient_nudge: { ambient: true, injection: 'nudge' },
+};
+
 /** Build the user-facing prompt for a given arm. Arms differ ONLY by the injected
- *  note, so any behavior delta is attributable to the intervention. */
+ *  note (and, orthogonally, the system prompt), so deltas are attributable. */
 export function buildAgentPrompt(scenario: EvalScenario, arm: Arm): string {
   const base =
     `Task: ${scenario.task}\n\n` +
     `Here's what I have so far:\n\n\`\`\`ts\n${scenario.diyState}\n\`\`\`\n\n`;
 
   const injection =
-    arm === 'A_control'
+    ARM_SPEC[arm].injection === 'none'
       ? ''
-      : arm === 'B_nudge'
+      : ARM_SPEC[arm].injection === 'nudge'
         ? `\n[Tool note] Recurring DIY ${scenario.category} detected — a vetted library may ` +
           `already cover this. Consider consulting available tooling before writing more ` +
           `custom ${scenario.category} code.\n`
@@ -68,7 +89,8 @@ export function parseDecision(raw: string): Decision {
 }
 
 async function classifyOnce(llm: LlmFn, scenario: EvalScenario, arm: Arm): Promise<Decision> {
-  const response = await llm(buildAgentPrompt(scenario, arm), AGENT_SYSTEM);
+  const system = ARM_SPEC[arm].ambient ? AGENT_SYSTEM_AMBIENT : AGENT_SYSTEM;
+  const response = await llm(buildAgentPrompt(scenario, arm), system);
   const grade = await llm(buildGraderPrompt(scenario.category, response), GRADER_SYSTEM);
   return parseDecision(grade);
 }
@@ -107,11 +129,12 @@ export interface EvalReport {
   model: string;
   overall: Record<Arm, ArmRate>;
   byScenario: ScenarioResult[];
-  lift_A_to_B: number; // the go/no-go number (percentage points)
-  lift_B_to_C: number;
+  lift_A_to_B: number; // nudge vs bare model (upper bound, percentage points)
+  lift_B_to_C: number; // advice content vs nudge
+  lift_D_to_E: number; // nudge MARGINAL over the ambient CLAUDE.md instruction (honest go/no-go)
 }
 
-const ARMS: Arm[] = ['A_control', 'B_nudge', 'C_advice'];
+const ARMS: Arm[] = ['A_control', 'B_nudge', 'C_advice', 'D_ambient', 'E_ambient_nudge'];
 
 export async function runTripwireEval(
   llm: LlmFn,
@@ -164,5 +187,6 @@ export async function runTripwireEval(
     byScenario,
     lift_A_to_B: (overall.B_nudge.adopt_rate - overall.A_control.adopt_rate) * 100,
     lift_B_to_C: (overall.C_advice.adopt_rate - overall.B_nudge.adopt_rate) * 100,
+    lift_D_to_E: (overall.E_ambient_nudge.adopt_rate - overall.D_ambient.adopt_rate) * 100,
   };
 }
