@@ -200,4 +200,91 @@ export const signToken = (id: string) => jwt.sign({ sub: id }, process.env.JWT_S
     expect(warned.length).toBe(1);
     expect(warned[0]).toContain('authentication');
   });
+
+  it('handles a MultiEdit edits[] payload', () => {
+    const env = freshEnv();
+    const input = {
+      file_path: join(env.cwd, 'src', 'auth.ts'),
+      edits: [
+        { old_string: 'a', new_string: `import jwt from 'jsonwebtoken';` },
+        { old_string: 'b', new_string: `export const s = (i) => jwt.sign({ sub: i }, process.env.JWT_SECRET);` },
+      ],
+    };
+    runEdit('MultiEdit', input, env);
+    const warned = runEdit('MultiEdit', input, env);
+    expect(warned.length).toBe(1);
+    expect(warned[0]).toContain('authentication');
+  });
+});
+
+// GOLDEN: drive the shim with a payload shaped like Claude Code's REAL PostToolUse
+// stdin (all top-level fields present, verified against code.claude.com/docs), not
+// a minimal synthetic one. Proves the shim reads the right fields and ignores the
+// rest — the guard against a silent no-op if the real envelope carries extras.
+describe('real PostToolUse envelope (golden)', () => {
+  function fullEnvelope(toolName: string, toolInput: Record<string, unknown>, cwd: string) {
+    return JSON.stringify({
+      session_id: 'abc123',
+      prompt_id: '550e8400-e29b-41d4-a716-446655440000',
+      transcript_path: '/home/u/.claude/projects/x/transcript.jsonl',
+      cwd,
+      permission_mode: 'default',
+      hook_event_name: 'PostToolUse',
+      tool_name: toolName,
+      tool_input: toolInput,
+      tool_use_id: 'toolu_01ABC',
+      tool_output: 'File updated successfully',
+    });
+  }
+
+  function driveFull(toolName: string, toolInput: Record<string, unknown>): string[] {
+    const home = mkdtempSync(join(tmpdir(), 'starlog-golden-home-'));
+    const cwd = mkdtempSync(join(tmpdir(), 'starlog-golden-cwd-'));
+    mkdirSync(join(cwd, '.starlog'), { recursive: true });
+    const payload = fullEnvelope(toolName, { ...toolInput, file_path: join(cwd, 'src', 'auth.ts') }, cwd);
+    // Fire twice (same env) to cross the recurrence threshold deterministically.
+    execFileSync(process.execPath, [hookPath], { input: payload, encoding: 'utf8', env: { ...process.env, HOME: home } });
+    const out = execFileSync(process.execPath, [hookPath], {
+      input: payload,
+      encoding: 'utf8',
+      env: { ...process.env, HOME: home },
+    });
+    return out
+      .split('\n')
+      .filter((l) => l.trim().startsWith('{'))
+      .map((l) => JSON.parse(l).hookSpecificOutput.additionalContext as string);
+  }
+
+  const diy = `import jwt from 'jsonwebtoken';
+export const signToken = (id) => jwt.sign({ sub: id }, process.env.JWT_SECRET);`;
+
+  it('Write: full envelope → tripwire warns and emits valid hookSpecificOutput', () => {
+    const msgs = driveFull('Write', { content: diy });
+    expect(msgs.length).toBe(1);
+    expect(msgs[0]).toContain('authentication');
+    expect(msgs[0]).toContain('starlog_advise');
+  });
+
+  it('Edit: full envelope with new_string → tripwire warns', () => {
+    const msgs = driveFull('Edit', { old_string: '', new_string: diy });
+    expect(msgs.length).toBe(1);
+    expect(msgs[0]).toContain('authentication');
+  });
+
+  it('Bash install in a full envelope still surfaces install-facts (no regression)', () => {
+    const home = mkdtempSync(join(tmpdir(), 'starlog-golden-home-'));
+    const cwd = mkdtempSync(join(tmpdir(), 'starlog-golden-cwd-'));
+    const payload = fullEnvelope('Bash', { command: 'npm install event-stream' }, cwd);
+    const out = execFileSync(process.execPath, [hookPath], {
+      input: payload,
+      encoding: 'utf8',
+      env: { ...process.env, HOME: home },
+    });
+    const msgs = out
+      .split('\n')
+      .filter((l) => l.trim().startsWith('{'))
+      .map((l) => JSON.parse(l).hookSpecificOutput.additionalContext as string);
+    expect(msgs.length).toBe(1);
+    expect(msgs[0]).toContain('event-stream');
+  });
 });

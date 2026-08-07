@@ -224,8 +224,11 @@ const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit']);
 
 // Extract { path, content } from Claude's edit tool_input. Write carries the
 // full `content`; Edit carries `new_string` (the added code — enough for the
-// regex tripwire); MultiEdit carries an `edits[]` array of new_strings.
-function editPayload(toolInput: any): { path: string; content: string } | null {
+// regex tripwire); MultiEdit carries an `edits[]` array of new_strings. Field
+// names verified against Claude Code's real tool schemas (file_path / content /
+// new_string), not the diff-only `edits[].new_text` a docs summary suggested.
+// Exported for direct unit testing of the translation.
+export function editPayload(toolInput: any): { path: string; content: string } | null {
   const filePath = toolInput?.file_path;
   if (typeof filePath !== 'string' || !filePath) return null;
   let content = '';

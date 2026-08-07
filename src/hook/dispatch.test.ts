@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { runHook, dispatchRaw } from './dispatch.js';
@@ -127,6 +127,24 @@ export const signToken = (id: string) => jwt.sign({ sub: id }, process.env.JWT_S
     expect(warned.decision).toBe('warn');
     expect(warned.message).toContain('authentication');
     expect(warned.message).not.toContain('caching');
+  });
+
+  it('survives concurrent edits without throwing or corrupting the store', async () => {
+    // Agents fire tools sequentially in practice, but a hook must not crash or
+    // corrupt its store under parallel invocation. Fire 8 identical DIY edits at
+    // once and assert: every call resolves to a valid decision, none is deny, and
+    // the recurrence store is still valid JSON afterward. (We do NOT assert
+    // "exactly one warn" here — a read-modify-write race can legitimately skew
+    // the count; atomicity is a non-goal for a best-effort advisory tripwire.)
+    const results = await Promise.all(
+      Array.from({ length: 8 }, () => runHook({ event: 'after_file_edit', cwd, payload: jwtFile })),
+    );
+    for (const r of results) {
+      expect(['allow', 'warn']).toContain(r.decision);
+    }
+    // Store is readable + parseable after the concurrent writes (no truncation).
+    const store = JSON.parse(readFileSync(join(cwd, '.starlog', 'patterns.json'), 'utf8'));
+    expect(Array.isArray(store.patterns)).toBe(true);
   });
 
   it('accumulates the same pattern across different projects (shared global store)', async () => {

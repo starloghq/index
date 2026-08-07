@@ -141,7 +141,13 @@ export async function dispatchRaw(raw: string, eventOverride?: HookEvent): Promi
   let parsed: Partial<HookInput> = {};
   try {
     const trimmed = raw.trim();
-    if (trimmed) parsed = JSON.parse(trimmed) as Partial<HookInput>;
+    if (trimmed) {
+      // JSON.parse can yield null / a number / a string / a bool — accessing
+      // `.event` on a non-object (esp. null) would throw OUTSIDE this try and
+      // break the fail-open contract. Only adopt an actual object.
+      const p: unknown = JSON.parse(trimmed);
+      if (p !== null && typeof p === 'object') parsed = p as Partial<HookInput>;
+    }
   } catch {
     return ALLOW; // fail open on malformed JSON
   }
