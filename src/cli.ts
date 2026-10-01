@@ -204,7 +204,8 @@ program
   .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
   .option('--api-key <key>', 'Wire your org STARLOG_API_KEY into the MCP server (enables hosted org-private facts for your agent) — get a key at https://starlog.dev')
   .option('--agent-prompt', 'Print the canonical "set up Starlog" prompt to paste into your coding agent, then exit (writes nothing)')
-  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string; agentPrompt?: boolean }) => {
+  .option('--with-socket', "Also wire Socket's free hosted MCP server (live dependency scanner; sends checked package names to socket.dev)")
+  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string; agentPrompt?: boolean; withSocket?: boolean }) => {
     if (opts.agentPrompt) {
       // stdout carries ONLY the prompt so it can be captured verbatim
       // (e.g. the landing page generates its copy from this at build time).
@@ -223,6 +224,7 @@ program
         project: !!opts.project,
         all: !!opts.all,
         yes: !!opts.yes,
+        with_socket: !!opts.withSocket,
         agents_detected: detected,
         agents_count: detected.length,
       },
