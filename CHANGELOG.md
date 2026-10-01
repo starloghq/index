@@ -5,6 +5,7 @@ All notable changes to `starloghq` are documented here. This project follows [se
 ## Unreleased
 
 - **feat(cli): `starlog init --agent-prompt`** — prints the canonical "set up Starlog" prompt to paste into a coding agent (plain text, stable, writes nothing). The CLI now owns this text so the landing page's copy can be generated from it instead of drifting; an e2e drift guard fails if the prompt references a flag, file target, or non-interactive behavior the real `init` doesn't have. (#48)
+- **feat(init): opt-in `--with-socket` live dependency scanner.** Starlog facts are dated, point-in-time data. `starlog init --with-socket` also wires Socket's free hosted MCP server (`https://mcp.socket.dev/`, tool `depscore`), so the agent can check for anything disclosed since. It's opt-in because it sends checked package names to a third party. A user's own `socket` entry is never overwritten, and `--uninstall` removes only the one Starlog wrote. The agent instructions now say facts are point-in-time and tell the agent to also run a live scanner when one is available. (#67)
 
 ## 0.9.0
 

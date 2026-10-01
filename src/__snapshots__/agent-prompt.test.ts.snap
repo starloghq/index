@@ -14,6 +14,8 @@ exports[`AGENT_SETUP_PROMPT > is stable (snapshot) — a change here must be del
      starlog init -y
    Or, if I gave you a key:
      starlog init --api-key <key> -y
+   Then ask whether I also want a live dependency scanner on top of Starlog's dated facts (Socket — it sends the package names you check to socket.dev). Only if I say yes:
+     starlog init --with-socket -y
 
 4. Verify:
      starlog doctor
