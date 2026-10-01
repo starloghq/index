@@ -10,6 +10,7 @@ import { listPatterns, upsertPattern } from './patterns/store.js';
 import { scaffoldPackageize } from './patterns/packageize.js';
 import { overlayPath } from './engine/overlay-discovery.js';
 import { runInit } from './init.js';
+import { AGENT_SETUP_PROMPT } from './agent-prompt.js';
 import { runDoctor } from './doctor.js';
 import { startMcpServer } from './mcp.js';
 import {
@@ -202,7 +203,15 @@ program
   .option('-y, --yes', 'Apply changes without the confirmation prompt (for CI/non-interactive use)')
   .option('--uninstall', 'Remove Starlog from Claude Code settings and hooks')
   .option('--api-key <key>', 'Wire your org STARLOG_API_KEY into the MCP server (enables hosted org-private facts for your agent) — get a key at https://starlog.dev')
-  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string }) => {
+  .option('--agent-prompt', 'Print the canonical "set up Starlog" prompt to paste into your coding agent, then exit (writes nothing)')
+  .action(action('init failed', async (opts: { project?: boolean; all?: boolean; dryRun?: boolean; yes?: boolean; uninstall?: boolean; apiKey?: string; agentPrompt?: boolean }) => {
+    if (opts.agentPrompt) {
+      // stdout carries ONLY the prompt so it can be captured verbatim
+      // (e.g. the landing page generates its copy from this at build time).
+      console.log(AGENT_SETUP_PROMPT);
+      await track('cli_init', { mode: 'agent-prompt' }, { noTelemetry: noTelemetry() });
+      return;
+    }
     await runInit(opts);
 
     const agents = detectAgents();

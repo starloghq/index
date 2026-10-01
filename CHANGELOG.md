@@ -2,6 +2,10 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## Unreleased
+
+- **feat(cli): `starlog init --agent-prompt`** — prints the canonical "set up Starlog" prompt to paste into a coding agent (plain text, stable, writes nothing). The CLI now owns this text so the landing page's copy can be generated from it instead of drifting; an e2e drift guard fails if the prompt references a flag, file target, or non-interactive behavior the real `init` doesn't have. (#48)
+
 ## 0.9.0
 
 Pattern tracking and migrate-or-packageize advisories — track DIY capability code, prefer migrating to safe corpus libraries over repeating dangerous DIY, and packageize only when no safe alternative exists.
