@@ -83,6 +83,10 @@ starlog init --dry-run
 starlog init --uninstall
 ```
 
+Want your coding agent to do the setup? `starlog init --agent-prompt` prints a ready-to-paste prompt (preview → optional key → apply → `doctor` → restart → demo) that walks Claude Code, Cursor, Copilot, or Codex through it non-interactively. It writes nothing.
+
+Want a live dependency scanner next to Starlog's dated facts? `starlog init --with-socket` also wires [Socket](https://socket.dev)'s free hosted MCP server (`depscore`), so your agent can catch anything disclosed after a fact's "as of" date. It's opt-in because your agent then sends the package names it checks to socket.dev. An existing `socket` entry you configured yourself is never overwritten, and `--uninstall` removes only the entry Starlog wrote.
+
 ### Onboard a whole org at once
 
 Don't hand-author facts for every internal repo — point Starlog at a directory of checkouts and it derives them in one pass:

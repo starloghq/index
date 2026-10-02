@@ -2,12 +2,17 @@
 
 All notable changes to `starloghq` are documented here. This project follows [semantic versioning](https://semver.org/) (pre-1.0: minor = features, patch = fixes).
 
+## Unreleased
+
+- **feat(hook): proactive DIY detection** — PreToolUse `Write|Edit|MultiEdit` hook scores hand-rolled capability code, gates on confidence/recurrence, validates via `runAdvise`, surfaces candidates + facts + migration guidance via `permissionDecision: "ask"` + `permissionDecisionReason` (PreToolUse ignores `additionalContext`); denies only on org `diy_category` policy, with deny emitted before enrichment so I/O failures never fail-open. Wired for Claude Code (global), Cursor (`.cursor/hooks.json`), and VS Code Copilot (`.github/hooks/starlog.json`) using `node "/abs/path"` commands.
+- **feat(cli): `starlog facts diy-policy`** — set org allow/deny/flag for hand-rolled DIY code per capability category.
+- **feat(cli): `starlog init --agent-prompt`** — prints the canonical "set up Starlog" prompt to paste into a coding agent (plain text, stable, writes nothing). The CLI now owns this text so the landing page's copy can be generated from it instead of drifting; an e2e drift guard fails if the prompt references a flag, file target, or non-interactive behavior the real `init` doesn't have. (#48)
+- **feat(init): opt-in `--with-socket` live dependency scanner.** Starlog facts are dated, point-in-time data. `starlog init --with-socket` also wires Socket's free hosted MCP server (`https://mcp.socket.dev/`, tool `depscore`), so the agent can check for anything disclosed since. It's opt-in because it sends checked package names to a third party. A user's own `socket` entry is never overwritten, and `--uninstall` removes only the one Starlog wrote. The agent instructions now say facts are point-in-time and tell the agent to also run a live scanner when one is available. (#67)
+
 ## 0.9.0
 
 Pattern tracking and migrate-or-packageize advisories — track DIY capability code, prefer migrating to safe corpus libraries over repeating dangerous DIY, and packageize only when no safe alternative exists.
 
-- **feat(hook): proactive DIY detection** — PreToolUse `Write|Edit|MultiEdit` hook scores hand-rolled capability code, gates on confidence/recurrence, validates via `runAdvise`, surfaces candidates + facts + migration guidance via `permissionDecision: "ask"` + `permissionDecisionReason` (PreToolUse ignores `additionalContext`); denies only on org `diy_category` policy, with deny emitted before enrichment so I/O failures never fail-open. Wired for Claude Code (global), Cursor (`.cursor/hooks.json`), and VS Code Copilot (`.github/hooks/starlog.json`) using `node "/abs/path"` commands.
-- **feat(cli): `starlog facts diy-policy`** — set org allow/deny/flag for hand-rolled DIY code per capability category.
 - **feat(mcp): `starlog_advise` tool** — scans for DIY patterns or accepts an observation, searches the corpus, applies a facts-based safety gate, and returns **MIGRATE** (when Clerk/Auth0/Supabase-class alternatives exist), **PACKAGEIZE** (niche with no safe hit), or **WATCH** (below recurrence threshold).
 - **feat(cli): `starlog advise`, `starlog patterns scan|list`, `starlog advise packageize`** — CLI parity with bundled playbooks and private corpus/facts scaffolding for packageize paths.
 - **feat(patterns): project + global `.starlog/patterns.json` store** — heuristic scanners for the 7 indexed categories; recurrence threshold before advising action.
