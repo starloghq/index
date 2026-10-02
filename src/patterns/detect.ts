@@ -170,6 +170,37 @@ function scoreRule(rule: CategoryRule, relPath: string, content: string): { scor
 }
 
 /**
+ * Detect the single best-matching DIY capability category for ONE file's
+ * content. Cheap and synchronous (no filesystem walk) — this is the tripwire
+ * gate for the `after_file_edit` hook, which sees one edited file at a time and
+ * must decide in milliseconds whether it's worth any further work. Returns null
+ * when nothing clears the confidence floor (score < 3) or a known library is
+ * already present. Mirrors `scanProject`'s per-file scoring exactly.
+ */
+export function detectFile(relPath: string, content: string): DetectionHit | null {
+  // Bound the hot path: an oversized edit (e.g. a generated bundle) shouldn't
+  // run every rule's regexes over megabytes. Unlike scanProject — which skips
+  // big files outright because other files still cover the category — the
+  // tripwire sees only THIS file, so we scan a head slice rather than skip, and
+  // still catch signals near the top. 512KB matches scanProject's cap.
+  const scanned = content.length > 512_000 ? content.slice(0, 512_000) : content;
+  let best: DetectionHit | null = null;
+  for (const rule of CATEGORY_RULES) {
+    const { score, signals } = scoreRule(rule, relPath, scanned);
+    if (score < 3) continue;
+    const confidence = Math.min(100, score * 15);
+    if (!best || confidence > best.confidence) {
+      best = {
+        category: rule.category,
+        confidence,
+        signals: [...signals, { kind: 'path', value: relPath }],
+      };
+    }
+  }
+  return best;
+}
+
+/**
  * Scan a project directory for DIY capability patterns. Returns hits above a
  * minimum confidence threshold, one per category (best score wins).
  */

@@ -15,6 +15,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { getPackageRoot } from './paths.js';
+import { runHook } from './hook/dispatch.js';
+import { parseInstallCommand } from './patterns/install-parse.js';
 
 const CORPUS_DIR = path.join(getPackageRoot(), 'corpus-free');
 const L2_FACTS_PATH = path.join(CORPUS_DIR, 'l2-facts.json');
@@ -37,42 +39,6 @@ function loadL2Facts(): Record<string, any> {
 function lookupL2(rawPkg: string, normId: string): any {
   const facts = loadL2Facts();
   return facts[rawPkg] || facts[normId] || null;
-}
-
-// Strip a trailing version/tag so every downstream use (facts lookup, the
-// displayed name, the starlog_facts suggestion, the pending-queue manifest_id)
-// keys on the real package name. npm: pkg@1.2.3 / @scope/pkg@next (the leading
-// scope @ is preserved); pypi: pkg==1.0 / pkg>=2 / pkg[extra].
-function stripVersionSpec(name: string, ecosystem: string): string {
-  const n = String(name);
-  if (ecosystem === 'pypi') return n.split(/[<>=!~;[]/)[0];
-  const at = n.lastIndexOf('@');
-  return at > 0 ? n.slice(0, at) : n;
-}
-
-function normalizeToManifestId(pkg: string): string {
-  return pkg
-    .replace(/^@[^/]+\//, '')
-    .replace(/\./g, '-')
-    .toLowerCase();
-}
-
-// A token is a real package name only if it matches ecosystem naming rules
-// (after stripping a trailing version/tag). Rejects shell tokens, paths, quotes,
-// and anything with metacharacters — the grammars below allow only [a-z0-9._-]
-// plus one optional npm scope slash.
-function isValidPkgName(name: string, ecosystem: string): boolean {
-  if (!name) return false;
-  let n = String(name);
-  if (ecosystem === 'pypi') {
-    n = n.split(/[<>=!~;[]/)[0];
-  } else {
-    const at = n.lastIndexOf('@');
-    if (at > 0) n = n.slice(0, at); // strip trailing @version/@tag, keep leading scope
-  }
-  if (!n || n.length > 214) return false;
-  if (ecosystem === 'pypi') return /^[a-z0-9]([a-z0-9._-]*[a-z0-9])?$/i.test(n);
-  return /^(@[a-z0-9][a-z0-9._-]*\/)?[a-z0-9][a-z0-9._-]*$/i.test(n);
 }
 
 function findManifest(id: string): string | null {
@@ -116,36 +82,11 @@ function handlePayload(input: string): void {
   const data = JSON.parse(input);
   const cmd = (data.tool_input && data.tool_input.command) || '';
 
-  const patterns = [
-    /(?:npm\s+(?:install|i|add))\s+(.+)/i,
-    /(?:pnpm\s+add)\s+(.+)/i,
-    /(?:yarn\s+add)\s+(.+)/i,
-    /(?:pip\s+install)\s+(.+)/i,
-  ];
+  const parsed = parseInstallCommand(cmd);
+  if (!parsed) return;
+  const { ecosystem } = parsed;
 
-  let pkgArgs: string | null = null;
-  let ecosystem = 'npm';
-  for (const pat of patterns) {
-    const m = cmd.match(pat);
-    if (m) {
-      pkgArgs = m[1];
-      ecosystem = pat.source.includes('pip') ? 'pypi' : 'npm';
-      break;
-    }
-  }
-  if (!pkgArgs) return;
-
-  // Stop at the first shell operator/redirection so a compound command
-  // (npm i x && echo done; npm pack >/dev/null) can't bleed shell tokens into
-  // the package list, then keep only well-formed package names.
-  const headArgs = pkgArgs.split(/[;&|<>()`#\n]/)[0];
-  const rawPkgs = headArgs.split(/\s+/).filter((a) => a && !a.startsWith('-') && isValidPkgName(a, ecosystem));
-
-  for (const raw of rawPkgs) {
-    // Strip the trailing version/tag BEFORE lookup/display/queueing — otherwise a
-    // pinned install of a covered package (e.g. ua-parser-js@0.7.29) misses facts.
-    const originalPkg = stripVersionSpec(raw, ecosystem);
-    const pkg = normalizeToManifestId(originalPkg);
+  for (const { name: originalPkg, manifestId: pkg } of parsed.packages) {
     const manifestPath = findManifest(pkg) || findManifest(pkg.replace(/-/g, ''));
 
     // Surface FACTS for the just-installed package, looked up by name
@@ -211,17 +152,100 @@ function handlePayload(input: string): void {
   }
 }
 
-/** Read the PostToolUse payload from stdin and process it. Never throws; always
- *  exits 0 so the hook can never block a tool call. */
+// ── File-edit tripwire (after_file_edit) ───────────────────────────────────
+//
+// Claude Code has no literal `after_file_edit` event — a PostToolUse hook on the
+// Edit/Write/MultiEdit tools IS that event. `starlog init` registers this shim
+// under an `Edit|Write|MultiEdit` matcher; the payload is translated into the
+// portable dispatcher envelope and any warn is re-emitted in Claude's native
+// hookSpecificOutput shape. This is the Claude-Code half of the cross-platform
+// hook contract (the Go/Hookshot shim owns the same mapping for other hosts).
+const EDIT_TOOLS = new Set(['Edit', 'Write', 'MultiEdit']);
+
+// Extract { path, content } from Claude's edit tool_input. Write carries the
+// full `content`; Edit carries `new_string` (the added code — enough for the
+// regex tripwire); MultiEdit carries an `edits[]` array of new_strings. Field
+// names verified against Claude Code's real tool schemas (file_path / content /
+// new_string), not the diff-only `edits[].new_text` a docs summary suggested.
+// Exported for direct unit testing of the translation.
+export function editPayload(toolInput: any): { path: string; content: string } | null {
+  const filePath = toolInput?.file_path;
+  if (typeof filePath !== 'string' || !filePath) return null;
+  let content = '';
+  if (typeof toolInput.content === 'string') content = toolInput.content;
+  else if (typeof toolInput.new_string === 'string') content = toolInput.new_string;
+  else if (Array.isArray(toolInput.edits)) {
+    content = toolInput.edits
+      .map((e: any) => (typeof e?.new_string === 'string' ? e.new_string : ''))
+      .join('\n');
+  }
+  return { path: filePath, content };
+}
+
+async function handleEdit(data: any): Promise<void> {
+  const ep = editPayload(data.tool_input || {});
+  if (!ep) return;
+  const result = await runHook({
+    event: 'after_file_edit',
+    cwd: data.cwd || process.cwd(),
+    payload: { path: ep.path, content: ep.content },
+  });
+  if (result.decision !== 'allow' && result.message) {
+    console.log(
+      JSON.stringify({
+        hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: result.message },
+      }),
+    );
+  }
+}
+
+// ── Policy gate (before_execution) ─────────────────────────────────────────
+//
+// A PreToolUse hook on the Bash tool IS the "before_execution" event. For a
+// dependency-install command that L3 policy DENIES, the dispatcher returns
+// warn/deny; we map that to Claude's PreToolUse permissionDecision:
+//   deny → "deny" (hard block) · warn → "ask" (surface + user decides) · allow → nothing.
+async function handleBeforeExec(data: any): Promise<void> {
+  const command = data.tool_input?.command;
+  if (typeof command !== 'string') return;
+  const result = await runHook({
+    event: 'before_execution',
+    cwd: data.cwd || process.cwd(),
+    payload: { command },
+  });
+  if (result.decision === 'allow') return; // no decision → normal permission flow
+  const permissionDecision = result.decision === 'deny' ? 'deny' : 'ask';
+  console.log(
+    JSON.stringify({
+      hookSpecificOutput: {
+        hookEventName: 'PreToolUse',
+        permissionDecision,
+        permissionDecisionReason: result.message ?? 'Starlog policy',
+      },
+    }),
+  );
+}
+
+/** Read a hook payload from stdin and route it. Routes by event then tool:
+ *  PreToolUse/Bash → policy gate; PostToolUse edit tools → DIY tripwire;
+ *  everything else → install-facts. Never throws; always exits 0 so the hook can
+ *  never wedge a tool call. */
 export function run(): void {
   let input = '';
   const stdinTimeout = setTimeout(() => process.exit(0), 3000);
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => (input += chunk));
-  process.stdin.on('end', () => {
+  process.stdin.on('end', async () => {
     clearTimeout(stdinTimeout);
     try {
-      handlePayload(input);
+      const data = JSON.parse(input);
+      if (data.hook_event_name === 'PreToolUse') {
+        if (data.tool_name === 'Bash') await handleBeforeExec(data);
+      } else if (EDIT_TOOLS.has(data.tool_name)) {
+        await handleEdit(data);
+      } else {
+        handlePayload(input);
+      }
     } catch {
       // Never fail — advisory only.
     }

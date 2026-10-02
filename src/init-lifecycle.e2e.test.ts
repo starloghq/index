@@ -192,6 +192,54 @@ describe('starlog init / doctor lifecycle (e2e, spawned binary)', () => {
     expect(doctor2.stdout).toContain('agent reads this project'); // ASCII prefix of the "wired" line
   });
 
+  // ── 2b. Legacy Bash-only hook install → re-init adds the edit-tripwire matcher ─
+  it('re-init adds the Edit|Write|MultiEdit matcher to a Bash-only install, preserving foreign hooks', () => {
+    const { home, proj } = mkTemps();
+
+    // Hand-write a PRE-tripwire install: the starlog shim registered ONLY under
+    // the Bash matcher (the old single-hook world), alongside an unrelated
+    // user-owned PostToolUse hook that init must never touch.
+    mkdirSync(join(home, '.claude', 'hooks'), { recursive: true });
+    const shimCmd = `node "${join(home, '.claude', 'hooks', 'starlog-pkg-check.js')}"`;
+    writeFileSync(
+      settingsPath(home),
+      JSON.stringify({
+        hooks: {
+          PostToolUse: [
+            { matcher: 'Bash', hooks: [{ type: 'command', command: shimCmd, timeout: 10 }] },
+            { matcher: 'Read', hooks: [{ type: 'command', command: 'node /somewhere/foreign-hook.js' }] },
+          ],
+        },
+      }),
+      'utf8',
+    );
+
+    const init = runCli(['init', '-y'], { home, proj });
+    expect(init.status).toBe(0);
+
+    const settings = readSettings(home);
+    const post = settings.hooks.PostToolUse as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>;
+    const pre = (settings.hooks.PreToolUse ?? []) as Array<{ matcher?: string; hooks?: Array<{ command?: string }> }>;
+    const isStarlog = (e: { hooks?: Array<{ command?: string }> }) =>
+      e.hooks?.some((h) => h.command?.includes('starlog-pkg-check.js'));
+    const postMatchers = post.filter(isStarlog).map((e) => e.matcher).sort();
+    const preMatchers = pre.filter(isStarlog).map((e) => e.matcher).sort();
+
+    // Both PostToolUse matchers now present, exactly once each (no Bash duplicate),
+    // AND the new PreToolUse/Bash policy gate was added.
+    expect(postMatchers).toEqual(['Bash', 'Edit|Write|MultiEdit']);
+    expect(preMatchers).toEqual(['Bash']);
+    // The unrelated user hook survived untouched.
+    expect(post.some((e) => e.matcher === 'Read' && e.hooks?.some((h) => h.command === 'node /somewhere/foreign-hook.js'))).toBe(true);
+
+    // A second re-init is idempotent for the hook (no duplicate starlog entries).
+    const again = runCli(['init', '-y'], { home, proj });
+    expect(again.status).toBe(0);
+    const after = readSettings(home);
+    expect((after.hooks.PostToolUse as any[]).filter(isStarlog).length).toBe(2);
+    expect((after.hooks.PreToolUse as any[]).filter(isStarlog).length).toBe(1);
+  });
+
   // ── 3. Uninstall reverses a full --all --project install + backs up markers ─
   it('init --uninstall reverses a full install and backs up edited marker files', () => {
     const { home, proj } = mkTemps();
