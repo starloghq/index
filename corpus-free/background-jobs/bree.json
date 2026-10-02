@@ -4,7 +4,7 @@
   "repo": "breejs/bree",
   "ecosystem": "npm",
   "category": "background-jobs",
-  "solves": "Provides a lightweight Node.js job scheduler that uses worker threads to run sandboxed background jobs with support for cron expressions, human-friendly time intervals, dates, async/await, retries, throttling, concurrency, and graceful shutdown — all without requiring Redis, MongoDB, or any external database for job state management.",
+  "solves": "Provides a lightweight Node.js job scheduler that uses worker threads to run sandboxed background jobs with support for cron expressions, human-friendly time intervals, dates, async/await, retries, throttling, concurrency, and graceful shutdown \u2014 all without requiring Redis, MongoDB, or any external database for job state management.",
   "stack_affinity": [
     "node",
     "express",
@@ -39,7 +39,8 @@
     "graphile-worker",
     "bee-queue",
     "quirrel",
-    "custom-background-jobs"
+    "custom-background-jobs",
+    "trigger-dev"
   ],
   "health": {
     "stars": 3287,

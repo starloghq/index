@@ -1,0 +1,23 @@
+---
+description: Safety gates and validation rules for automated systems
+alwaysApply: true
+---
+
+# Safety and Validation
+
+- Systems must fail safely when information quality is uncertain.
+
+- If trusted data is unavailable:
+  - lower confidence
+  - request validation
+  - avoid irreversible actions
+
+- Clearly label:
+  - verified facts
+  - inferred information
+  - heuristics
+  - assumptions
+
+- Do not silently upgrade weak evidence into certainty.
+
+- Add validation layers before migrations, automated changes, or destructive operations.

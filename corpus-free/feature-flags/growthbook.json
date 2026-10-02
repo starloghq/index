@@ -1,0 +1,61 @@
+{
+  "id": "growthbook",
+  "name": "GrowthBook JS SDK",
+  "repo": "growthbook/growthbook",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides the GrowthBook TypeScript/JavaScript SDK (`@growthbook/growthbook`) for feature flags and A/B testing against GrowthBook's open-source, self-hostable experimentation platform.",
+  "stack_affinity": [
+    "react",
+    "next.js",
+    "node",
+    "vue",
+    "javascript",
+    "browser"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Product teams that want feature flags plus experimentation/statistics in one open-source stack",
+    "Organizations that need to self-host flag evaluation for cost or data-residency reasons",
+    "React/Next.js apps using GrowthBook's hooks and typed feature definitions",
+    "Teams graduating from DIY toggles who are not ready for LaunchDarkly pricing",
+    "Data-informed rollouts that combine flags with experiment analysis"
+  ],
+  "skip_when": [
+    "You need a vendor-neutral SDK layer first \u2014 start with OpenFeature and plug providers",
+    "You only need analytics-tied flags and already standardized on PostHog",
+    "You want the lightest possible boolean toggle without an experimentation platform",
+    "Enterprise support/SLA requirements point to LaunchDarkly or Statsig",
+    "Your primary runtime is unsupported by the JS SDK and you need another language first"
+  ],
+  "hosted_alternative": {
+    "name": "GrowthBook Cloud",
+    "manifest_id": "growthbook",
+    "pricing_summary": "Open-source self-host free; GrowthBook Cloud has a free tier and paid seats/usage plans"
+  },
+  "alternative_ids": [
+    "launchdarkly",
+    "posthog",
+    "flagsmith",
+    "unleash",
+    "openfeature",
+    "statsig",
+    "configcat",
+    "devcycle",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 8069,
+    "weekly_downloads": 952486,
+    "last_commit": "2026-07-29T22:19:42Z",
+    "contributors": 139,
+    "license": "MIT",
+    "open_issues": 837
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

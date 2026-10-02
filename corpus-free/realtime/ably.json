@@ -22,9 +22,9 @@
     "Projects that need a tree-shakable modular SDK to minimize bundle size for browser deployments"
   ],
   "skip_when": [
-    "You need a self-hosted or open-source realtime server — Ably is a paid hosted service with no self-hosted option",
+    "You need a self-hosted or open-source realtime server \u2014 Ably is a paid hosted service with no self-hosted option",
     "Your project only needs simple WebSocket connections without pub/sub semantics or managed infrastructure",
-    "Budget is zero — Ably has a free tier but production usage requires a paid plan",
+    "Budget is zero \u2014 Ably has a free tier but production usage requires a paid plan",
     "You need peer-to-peer communication or CRDT-based collaborative editing rather than pub/sub messaging",
     "You want to avoid vendor lock-in to a proprietary realtime messaging platform"
   ],
@@ -41,7 +41,8 @@
     "deepstream",
     "mqtt",
     "partykit",
-    "sockjs"
+    "sockjs",
+    "yjs"
   ],
   "health": {
     "stars": 360,

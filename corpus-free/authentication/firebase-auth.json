@@ -1,0 +1,59 @@
+{
+  "id": "firebase-auth",
+  "name": "Firebase Authentication",
+  "repo": "firebase/firebase-js-sdk",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides Firebase Authentication via the Firebase JS SDK (`firebase` / `firebase/auth`) for email/password, phone, anonymous, and federated identity providers, with tight integration to other Firebase products and multi-platform clients.",
+  "stack_affinity": [
+    "react",
+    "next.js",
+    "angular",
+    "vue",
+    "node",
+    "react-native",
+    "flutter",
+    "android",
+    "ios"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Apps already on Firebase (Firestore, Cloud Functions, Hosting) that want auth in the same Google cloud stack",
+    "Mobile + web products needing shared identity across Firebase client SDKs",
+    "Teams that want Google-managed identity with social providers and phone auth without running an IdP",
+    "Prototypes and products that benefit from Firebase's generous free tier and console UX",
+    "Projects that need anonymous auth upgrading to permanent accounts"
+  ],
+  "skip_when": [
+    "You must keep user credentials and session stores entirely self-hosted with no Google dependency",
+    "You need fine-grained B2B organization SSO/SCIM as the primary product (consider WorkOS/Clerk)",
+    "Your backend is not using Firebase and you only need a thin JWT library",
+    "Vendor lock-in to Google Cloud identity is unacceptable for procurement or data residency reasons",
+    "You want open-source Auth.js/Better Auth with your own Postgres user table as source of truth"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "clerk",
+    "auth0",
+    "nextauth",
+    "better-auth",
+    "supabase-auth",
+    "aws-cognito",
+    "workos",
+    "custom-authentication"
+  ],
+  "health": {
+    "stars": 5134,
+    "weekly_downloads": 8878480,
+    "last_commit": "2026-07-28T20:48:25Z",
+    "contributors": 231,
+    "license": "Apache-2.0",
+    "open_issues": 720
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

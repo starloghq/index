@@ -1,0 +1,60 @@
+{
+  "id": "unleash",
+  "name": "Unleash Node.js SDK",
+  "repo": "Unleash/unleash-node-sdk",
+  "ecosystem": "npm",
+  "category": "feature-flags",
+  "solves": "Provides the official Node.js client (`unleash-client`) for the Unleash feature management platform, evaluating flags server-side with streaming or polling updates, activation strategies, and constraints against a self-hosted or Unleash-hosted control plane.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "nest.js",
+    "fastify",
+    "next.js"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Node backends that evaluate Unleash flags server-side with the official SDK",
+    "Organizations running Unleash (self-hosted or Unleash Cloud) that need a maintained Node client",
+    "Services that need activation strategies and context constraints without embedding a full flag UI",
+    "Platform teams standardizing on Unleash across languages via official SDKs",
+    "Migrations off homemade toggle tables toward Unleash-backed evaluation"
+  ],
+  "skip_when": [
+    "You want flags bundled with product analytics (PostHog) rather than a dedicated feature-management tool",
+    "You need to self-host the Unleash server and AGPL-3.0 is incompatible \u2014 use Unleash Cloud/Enterprise or another vendor",
+    "You only need a vendor-neutral API and have not chosen an Unleash backend \u2014 start with OpenFeature plus a provider",
+    "A tiny boolean config in env vars is enough",
+    "You prefer GrowthBook's experimentation-first workflow over Unleash's FM model"
+  ],
+  "hosted_alternative": {
+    "name": "Unleash Cloud",
+    "manifest_id": "unleash",
+    "pricing_summary": "Node SDK is Apache-2.0; Unleash server self-host is AGPL-3.0. Unleash Cloud/Enterprise plans are commercial"
+  },
+  "alternative_ids": [
+    "launchdarkly",
+    "growthbook",
+    "flagsmith",
+    "posthog",
+    "openfeature",
+    "statsig",
+    "configcat",
+    "devcycle",
+    "custom-feature-flags"
+  ],
+  "health": {
+    "stars": 226,
+    "weekly_downloads": 729006,
+    "last_commit": "2026-07-16T09:40:29Z",
+    "contributors": 69,
+    "license": "Apache-2.0",
+    "open_issues": 17
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

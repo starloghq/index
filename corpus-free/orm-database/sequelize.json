@@ -1,0 +1,58 @@
+{
+  "id": "sequelize",
+  "name": "Sequelize",
+  "repo": "sequelize/sequelize",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides a promise-based Node.js ORM for Postgres, MySQL, MariaDB, SQLite, and more with models, associations, transactions, and migrations \u2014 a long-standing choice for classic Node data layers.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "nest.js",
+    "typescript",
+    "javascript",
+    "postgresql",
+    "mysql"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Existing Sequelize codebases and teams experienced with its model/association APIs",
+    "Multi-SQL-dialect Node apps needing a battle-tested ORM",
+    "Projects that want attribute validations, hooks, and eager/lazy loading patterns",
+    "Migrations via sequelize-cli in traditional Express services",
+    "Teams not ready to rewrite to Prisma/Drizzle"
+  ],
+  "skip_when": [
+    "You want cutting-edge TypeScript inference from schema \u2014 Prisma/Drizzle/Kysely excel here",
+    "You are on MongoDB \u2014 use Mongoose",
+    "You prefer SQL-first query building without a full ORM",
+    "Greenfield NestJS apps often default to TypeORM/Prisma instead",
+    "You need a minimal PG driver only"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "prisma",
+    "typeorm",
+    "drizzle",
+    "kysely",
+    "mikro-orm",
+    "knex",
+    "mongoose",
+    "postgres-js",
+    "custom-orm"
+  ],
+  "health": {
+    "stars": 30378,
+    "weekly_downloads": 2894696,
+    "last_commit": "2026-07-29T18:05:59Z",
+    "contributors": 1255,
+    "license": "MIT",
+    "open_issues": 1068
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

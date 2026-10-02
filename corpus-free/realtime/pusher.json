@@ -43,7 +43,8 @@
     "deepstream",
     "liveblocks",
     "mqtt",
-    "partykit"
+    "partykit",
+    "yjs"
   ],
   "health": {
     "stars": 2218,

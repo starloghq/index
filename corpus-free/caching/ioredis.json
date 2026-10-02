@@ -4,7 +4,7 @@
   "repo": "redis/ioredis",
   "ecosystem": "npm",
   "category": "caching",
-  "solves": "Provides a full-featured, high-performance Redis client for Node.js with native support for Redis Cluster, Sentinel, Streams, Pub/Sub, pipelining, autopipelining, Lua scripting, and TLS — enabling applications to use Redis for caching, real-time messaging, and distributed data management.",
+  "solves": "Provides a full-featured, high-performance Redis client for Node.js with native support for Redis Cluster, Sentinel, Streams, Pub/Sub, pipelining, autopipelining, Lua scripting, and TLS \u2014 enabling applications to use Redis for caching, real-time messaging, and distributed data management.",
   "stack_affinity": [
     "node",
     "express",
@@ -42,7 +42,8 @@
     "unstorage",
     "custom-caching",
     "memcached",
-    "node-cache"
+    "node-cache",
+    "lru-cache"
   ],
   "health": {
     "stars": 15284,

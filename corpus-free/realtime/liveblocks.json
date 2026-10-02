@@ -1,0 +1,55 @@
+{
+  "id": "liveblocks",
+  "name": "Liveblocks",
+  "repo": "liveblocks/liveblocks",
+  "ecosystem": "npm",
+  "category": "realtime",
+  "solves": "Provides managed realtime infrastructure for multiplayer apps \u2014 presence, rooms, Yjs storage, comments, and AI copilots \u2014 with React-first SDKs so teams ship collaborative features without operating WebSocket servers.",
+  "stack_affinity": [
+    "react",
+    "next.js",
+    "vue",
+    "svelte",
+    "javascript",
+    "yjs"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Product teams adding multiplayer presence, cursors, and collaborative state quickly",
+    "React/Next.js apps that want hosted rooms instead of self-hosting Socket.IO/Yjs providers",
+    "Editors that want Liveblocks Yjs integration without running a sync backend",
+    "Apps needing comments, notifications, and multiplayer UX primitives from one vendor",
+    "Startups that value time-to-multiplayer over owning realtime infrastructure"
+  ],
+  "skip_when": [
+    "You must self-host all realtime infrastructure with no SaaS dependency",
+    "You only need a simple chat channel \u2014 Socket.IO or a thin ws server may suffice",
+    "IoT/MQTT protocols are required rather than web multiplayer rooms",
+    "Budget cannot support a managed multiplayer platform beyond free tiers",
+    "You already operate a mature Yjs/PartyKit stack and do not want another vendor"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "yjs",
+    "partykit",
+    "socket-io",
+    "ably",
+    "pusher",
+    "supabase-realtime",
+    "custom-realtime"
+  ],
+  "health": {
+    "stars": 4680,
+    "weekly_downloads": 345468,
+    "last_commit": "2026-07-28T18:38:03Z",
+    "contributors": 44,
+    "license": "Apache-2.0",
+    "open_issues": 77
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

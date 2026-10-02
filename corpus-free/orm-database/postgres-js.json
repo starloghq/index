@@ -1,0 +1,55 @@
+{
+  "id": "postgres-js",
+  "name": "Postgres.js",
+  "repo": "porsager/postgres",
+  "ecosystem": "npm",
+  "category": "orm-database",
+  "solves": "Provides a fast, full-featured PostgreSQL client for Node.js, Deno, Bun, and Cloudflare Workers with tagged-template SQL, transactions, and cursors \u2014 a database driver and SQL client, not an ORM or query-builder framework.",
+  "stack_affinity": [
+    "node",
+    "bun",
+    "deno",
+    "cloudflare-workers",
+    "postgresql",
+    "typescript"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "PostgreSQL-only apps that want a minimal, very fast SQL client",
+    "Edge, Bun, or Deno runtimes where classic `pg` is awkward",
+    "Teams writing tagged-template SQL with good ergonomics and safety",
+    "Services that pair a thin client with Drizzle or Kysely, or hand-written SQL",
+    "High-throughput APIs sensitive to client overhead"
+  ],
+  "skip_when": [
+    "You need an ORM with models, relations, and migrations \u2014 use Prisma, Drizzle, TypeORM, or Sequelize",
+    "You need a multi-dialect query builder \u2014 use Knex, Kysely, or Drizzle",
+    "You are on MySQL, SQLite, or SQL Server rather than Postgres",
+    "You prefer the node-postgres (`pg`) ecosystem and middleware already in your stack",
+    "You want schema-first generated clients (Prisma) rather than hand-written SQL"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "prisma",
+    "drizzle",
+    "kysely",
+    "knex",
+    "typeorm",
+    "slonik",
+    "custom-orm"
+  ],
+  "health": {
+    "stars": 8682,
+    "weekly_downloads": 12058383,
+    "last_commit": "2026-04-05T15:17:13Z",
+    "contributors": 80,
+    "license": "Unlicense",
+    "open_issues": 269
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "maintained"
+  }
+}

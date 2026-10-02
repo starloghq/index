@@ -1,0 +1,66 @@
+{
+  "id": "better-auth",
+  "name": "Better Auth",
+  "repo": "better-auth/better-auth",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides a comprehensive TypeScript-first authentication framework with email/password, social OAuth, magic links, passkeys, 2FA, organizations/teams, and plugins \u2014 runnable self-hosted against your own database without a mandatory identity SaaS.",
+  "stack_affinity": [
+    "next.js",
+    "nuxt",
+    "sveltekit",
+    "solidstart",
+    "astro",
+    "hono",
+    "express",
+    "node",
+    "tanstack-start",
+    "react"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Modern TypeScript apps that want a batteries-included auth framework with first-class TypeScript types and plugins",
+    "Teams leaving Lucia or DIY auth who still want self-hosted control over users and sessions",
+    "Products needing organizations, roles, passkeys, and 2FA without adopting a hosted auth vendor",
+    "Full-stack frameworks (Next.js, Nuxt, SvelteKit, Hono) that want a consistent auth API across adapters",
+    "Projects that want Auth.js-like openness with a more opinionated, actively evolving feature set"
+  ],
+  "skip_when": [
+    "You want zero auth infrastructure and prefer a fully managed UI+API vendor (Clerk, Auth0, WorkOS)",
+    "You need a minimal library that only verifies JWTs and nothing else",
+    "Your backend is not TypeScript/JavaScript",
+    "You prefer Auth.js (next-auth) for its longer production track record and more conservative API evolution",
+    "Compliance requires an enterprise IdP with SOC2-backed hosted identity you do not operate yourself"
+  ],
+  "hosted_alternative": {
+    "name": "Clerk",
+    "manifest_id": "clerk",
+    "pricing_summary": "Free tier for small apps; paid plans scale with monthly active users and organizations"
+  },
+  "alternative_ids": [
+    "nextauth",
+    "clerk",
+    "auth0",
+    "lucia",
+    "supabase-auth",
+    "firebase-auth",
+    "passport",
+    "aws-cognito",
+    "workos",
+    "custom-authentication"
+  ],
+  "health": {
+    "stars": 29382,
+    "weekly_downloads": 6470874,
+    "last_commit": "2026-07-29T09:02:48Z",
+    "contributors": 900,
+    "license": "MIT",
+    "open_issues": 625
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}
