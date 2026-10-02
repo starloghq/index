@@ -1,20 +1,24 @@
-// hook-runner.ts — the real PostToolUse install-hook logic.
+// hook-runner.ts — Claude Code hook dispatcher (install vet + DIY detection).
 //
 // Why this is a module and not inlined into the generated hook script:
 // `starlog init` installs a THIN SHIM at ~/.claude/hooks/starlog-pkg-check.js
 // that resolves and runs THIS module from the installed `starloghq` package. So
 // `npm update starloghq` refreshes hook BEHAVIOUR with zero re-init — the shim on
 // disk never changes, only the package's dist/hook-runner.js it points at.
-// (Corpus DATA already refreshed on upgrade; this closes the same gap for LOGIC.)
 //
-// Contract: advisory only. It reads a Claude Code PostToolUse payload on stdin,
-// and for each package in a detected install command emits exactly one
-// hookSpecificOutput line with Starlog facts, then queues unknown packages for
-// batch manifest generation. It must NEVER throw out or block a tool call.
+// Routes:
+//   PreToolUse Write|Edit|MultiEdit → DIY pattern detect + starlog advise inject
+//   PostToolUse Bash               → package-install facts vetting
+//
+// Contract: advisory by default; deny only on org DIY policy. Never throw.
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { getPackageRoot } from './paths.js';
+import { detectHookPlatform, emitPostToolUseContext } from './hook-output.js';
+import { handleDiyPreToolUse } from './diy-hook-runner.js';
+
+const WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit']);
 
 const CORPUS_DIR = path.join(getPackageRoot(), 'corpus-free');
 const L2_FACTS_PATH = path.join(CORPUS_DIR, 'l2-facts.json');
@@ -112,9 +116,10 @@ function factsMessage(originalPkg: string, l2: any): string {
   return '[Starlog] No facts on file for "' + originalPkg + '". Run starlog_facts ' + originalPkg + ' to vet it.';
 }
 
-function handlePayload(input: string): void {
-  const data = JSON.parse(input);
-  const cmd = (data.tool_input && data.tool_input.command) || '';
+function handleInstallPayload(data: Record<string, unknown>): void {
+  const platform = detectHookPlatform(data);
+  const toolInput = (data.tool_input ?? {}) as Record<string, unknown>;
+  const cmd = String(toolInput.command ?? data.command ?? '');
 
   const patterns = [
     /(?:npm\s+(?:install|i|add))\s+(.+)/i,
@@ -152,11 +157,7 @@ function handlePayload(input: string): void {
     // independently of whether a corpus-free manifest exists. Exactly one
     // hookSpecificOutput per detected package (advisory; never fails).
     const l2 = lookupL2(originalPkg, pkg);
-    console.log(
-      JSON.stringify({
-        hookSpecificOutput: { hookEventName: 'PostToolUse', additionalContext: factsMessage(originalPkg, l2) },
-      }),
-    );
+    emitPostToolUseContext(platform, factsMessage(originalPkg, l2));
 
     if (!manifestPath) {
       // Queue for batch generation.
@@ -164,7 +165,7 @@ function handlePayload(input: string): void {
         const homedir = os.homedir();
         const globalQueueDir = path.join(homedir, '.starlog');
         const globalQueuePath = path.join(globalQueueDir, 'pending.json');
-        const localQueueDir = path.join(data.cwd || process.cwd(), '.starlog');
+        const localQueueDir = path.join(String(data.cwd ?? process.cwd()), '.starlog');
         const localQueuePath = path.join(localQueueDir, 'pending.json');
 
         const entry = {
@@ -172,7 +173,7 @@ function handlePayload(input: string): void {
           manifest_id: pkg,
           ecosystem: ecosystem,
           detected_at: new Date().toISOString(),
-          source_project: data.cwd || process.cwd(),
+          source_project: String(data.cwd ?? process.cwd()),
           install_command: cmd,
           status: 'pending',
         };
@@ -211,20 +212,35 @@ function handlePayload(input: string): void {
   }
 }
 
-/** Read the PostToolUse payload from stdin and process it. Never throws; always
- *  exits 0 so the hook can never block a tool call. */
+/** Read hook payload from stdin, dispatch to install-vet or DIY detect. Never throws. */
 export function run(): void {
   let input = '';
-  const stdinTimeout = setTimeout(() => process.exit(0), 3000);
+  const stdinTimeout = setTimeout(() => process.exit(0), 8000);
   process.stdin.setEncoding('utf8');
   process.stdin.on('data', (chunk) => (input += chunk));
   process.stdin.on('end', () => {
     clearTimeout(stdinTimeout);
-    try {
-      handlePayload(input);
-    } catch {
-      // Never fail — advisory only.
-    }
-    process.exit(0);
+    void (async () => {
+      try {
+        const data = JSON.parse(input) as Record<string, unknown>;
+        const event = String(data.hook_event_name ?? data.hookEventName ?? '');
+        const tool = String(data.tool_name ?? '');
+
+        if (event === 'beforeShellExecution') {
+          handleInstallPayload({ ...data, tool_input: { command: data.command ?? '' } });
+        } else if (
+          event === 'preToolUse' ||
+          event === 'PreToolUse' ||
+          WRITE_TOOLS.has(tool)
+        ) {
+          await handleDiyPreToolUse(data);
+        } else {
+          handleInstallPayload(data);
+        }
+      } catch {
+        // Never fail — advisory only.
+      }
+      process.exit(0);
+    })();
   });
 }

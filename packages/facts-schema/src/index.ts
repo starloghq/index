@@ -80,6 +80,8 @@ export const L3RuleSchema = z.object({
     maintenance: z.enum(['active', 'maintenance-only', 'deprecated', 'abandoned', 'compromised']).optional(),
     has_known_vulns: z.boolean().optional(),
     capability: z.string().optional(),
+    /** Block or flag hand-rolled DIY code for a capability category (e.g. authentication). */
+    diy_category: z.string().optional(),
   }),
   rationale: z.string(),
 });
@@ -117,12 +119,37 @@ export function evaluatePolicy(
 
 function ruleMatches(rule: L3Rule, { l1, l2 }: { l1: L1CapabilityFact | null; l2: L2Overlay | null }): boolean {
   const m = rule.match;
+  // DIY-category rules are evaluated separately via evaluateDiyPolicy.
+  if (m.diy_category !== undefined) return false;
   if (m.package !== undefined && m.package !== (l1?.package ?? l2?.package)) return false;
   if (m.license_risk !== undefined && m.license_risk !== l2?.license_risk) return false;
   if (m.maintenance !== undefined && m.maintenance !== l2?.maintenance) return false;
   if (m.has_known_vulns !== undefined && m.has_known_vulns !== ((l2?.known_vulns.length ?? 0) > 0)) return false;
   if (m.capability !== undefined && !(l1?.capabilities ?? []).includes(m.capability)) return false;
   return Object.values(m).some((v) => v !== undefined); // empty match must not fire
+}
+
+export interface DiyPolicyVerdict {
+  decision: L3Decision | 'none';
+  rule_id?: string;
+  rationale?: string;
+}
+
+/**
+ * Evaluate org policy rules that target hand-rolled DIY capability code.
+ * First matching diy_category rule wins; package/facts rules are ignored here.
+ */
+export function evaluateDiyPolicy(
+  policy: L3Policy | null | undefined,
+  category: string,
+): DiyPolicyVerdict {
+  if (!policy || policy.rules.length === 0) return { decision: 'none' };
+  for (const rule of policy.rules) {
+    if (rule.match.diy_category !== undefined && rule.match.diy_category === category) {
+      return { decision: rule.decision, rule_id: rule.id, rationale: rule.rationale };
+    }
+  }
+  return { decision: 'none' };
 }
 
 // ── FactView — the composed serve/API shape (the GET /facts envelope) ─────────

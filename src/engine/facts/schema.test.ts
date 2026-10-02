@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { L1CapabilityFactSchema } from '@starloghq/facts-schema';
 import { L2OverlaySchema, VulnSchema } from '@starloghq/facts-schema';
-import { L3PolicySchema, L3RuleSchema } from '@starloghq/facts-schema';
+import { L3PolicySchema, L3RuleSchema, evaluateDiyPolicy, type L3Policy } from '@starloghq/facts-schema';
 
 // Helpers building minimal-valid records per layer.
 const l1 = (o: Record<string, unknown> = {}) => ({
@@ -102,5 +102,38 @@ describe('L3PolicySchema / L3RuleSchema', () => {
 
   it('rejects an out-of-domain decision', () => {
     expect(L3RuleSchema.safeParse({ id: 'r', decision: 'nuke', match: { package: 'x' }, rationale: 'y' }).success).toBe(false);
+  });
+
+  it('accepts diy_category match rules', () => {
+    const r = L3RuleSchema.safeParse({
+      id: 'diy-authentication',
+      decision: 'deny',
+      match: { diy_category: 'authentication' },
+      rationale: 'use Clerk/Auth0',
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
+describe('evaluateDiyPolicy', () => {
+  it('returns none when no policy or no diy rules', () => {
+    expect(evaluateDiyPolicy(null, 'authentication')).toEqual({ decision: 'none' });
+    expect(evaluateDiyPolicy({ org: 'acme', rules: [] }, 'authentication')).toEqual({ decision: 'none' });
+  });
+
+  it('matches diy_category rules and ignores package rules', () => {
+    const policy: L3Policy = {
+      org: 'acme',
+      rules: [
+        { id: 'pkg-x', decision: 'deny', match: { package: 'lodash' }, rationale: 'banned' },
+        { id: 'diy-auth', decision: 'deny', match: { diy_category: 'authentication' }, rationale: 'no DIY auth' },
+      ],
+    };
+    expect(evaluateDiyPolicy(policy, 'authentication')).toEqual({
+      decision: 'deny',
+      rule_id: 'diy-auth',
+      rationale: 'no DIY auth',
+    });
+    expect(evaluateDiyPolicy(policy, 'caching')).toEqual({ decision: 'none' });
   });
 });

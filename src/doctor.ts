@@ -180,62 +180,78 @@ async function checkMcp(settings: Record<string, unknown> | null): Promise<Check
   return checks;
 }
 
-// ── PostToolUse hook ────────────────────────────────────────────────────────
+// ── Claude Code hooks (install vet + DIY detect) ────────────────────────────
 
-async function checkHook(settings: Record<string, unknown> | null): Promise<Check[]> {
+function hookEntryUsesStarlog(entry: unknown): boolean {
+  const e = entry as { hooks?: Array<{ command?: string }> };
+  return e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME)) ?? false;
+}
+
+async function checkHookScript(): Promise<Check[]> {
   const checks: Check[] = [];
   const hookFilePresent = await fileExists(HOOK_PATH);
 
-  const hooks = settings?.hooks as { PostToolUse?: Array<{ hooks?: Array<{ command?: string }> }> } | undefined;
-  const registered = (hooks?.PostToolUse ?? []).some((e) =>
-    e.hooks?.some((h) => h.command?.includes(HOOK_FILENAME)),
-  );
-
-  if (!hookFilePresent && !registered) {
-    checks.push({ level: 'warn', label: 'PostToolUse hook', detail: 'not installed — run `starlog init`' });
+  if (!hookFilePresent) {
+    checks.push({ level: 'warn', label: 'Hook script', detail: 'not installed — run `starlog init`' });
     return checks;
   }
 
-  if (hookFilePresent) {
-    try {
-      await execFileAsync(process.execPath, ['--check', HOOK_PATH]);
-      checks.push({ level: 'ok', label: 'PostToolUse hook', detail: 'script present and valid' });
-    } catch (err) {
-      const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
-      checks.push({ level: 'fail', label: 'PostToolUse hook', detail: `script has a syntax error (${msg})` });
-    }
-
-    // The installed hook is a thin shim that loads the package's dist/hook-runner.js
-    // at runtime (so upgrades refresh behaviour with no re-init). Verify that logic
-    // module is actually resolvable — a broken upgrade would otherwise silently stop
-    // surfacing facts. Only meaningful for the shim; a legacy self-contained hook has
-    // no such dependency, so we skip the check when the marker is absent.
-    const runnerPath = join(getPackageRoot(), 'dist', 'hook-runner.js');
-    const isShim = await readFile(HOOK_PATH, 'utf8').then((c) => c.includes('hook-runner.js')).catch(() => false);
-    if (isShim) {
-      checks.push(
-        (await fileExists(runnerPath))
-          ? { level: 'ok', label: 'Hook logic', detail: 'hook-runner.js resolves — upgrades refresh behaviour with no re-init' }
-          : { level: 'fail', label: 'Hook logic', detail: `shim cannot load its logic (${runnerPath} missing) — re-run \`starlog init\`` },
-      );
-    } else {
-      // A legacy self-contained hook (installed before the runtime-shim migration)
-      // still carries its logic inline, so a package upgrade never refreshes it —
-      // the user keeps whatever hook shipped with the version they first init'd,
-      // including any since-fixed bug. `--check` passes and it still runs, so the
-      // check above reports [ok]; without this the user is never told they're
-      // frozen on old behaviour. Warn (not fail) and point at the one-command fix.
-      checks.push({
-        level: 'warn',
-        label: 'Hook logic',
-        detail: 'legacy self-contained hook — it will not auto-refresh on upgrade; re-run `starlog init` to adopt the shim (zero-touch upgrades)',
-      });
-    }
-  } else {
-    checks.push({ level: 'fail', label: 'PostToolUse hook', detail: 'registered in settings but script file is missing' });
+  try {
+    await execFileAsync(process.execPath, ['--check', HOOK_PATH]);
+    checks.push({ level: 'ok', label: 'Hook script', detail: 'present and valid' });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message.split('\n')[0] : String(err);
+    checks.push({ level: 'fail', label: 'Hook script', detail: `syntax error (${msg})` });
   }
 
-  if (hookFilePresent && !registered) {
+  const runnerPath = join(getPackageRoot(), 'dist', 'hook-runner.js');
+  const isShim = await readFile(HOOK_PATH, 'utf8').then((c) => c.includes('hook-runner.js')).catch(() => false);
+  if (isShim) {
+    checks.push(
+      (await fileExists(runnerPath))
+        ? { level: 'ok', label: 'Hook logic', detail: 'hook-runner.js resolves — upgrades refresh behaviour with no re-init' }
+        : { level: 'fail', label: 'Hook logic', detail: `shim cannot load its logic (${runnerPath} missing) — re-run \`starlog init\`` },
+    );
+  } else {
+    checks.push({
+      level: 'warn',
+      label: 'Hook logic',
+      detail: 'legacy self-contained hook — it will not auto-refresh on upgrade; re-run `starlog init` to adopt the shim (zero-touch upgrades)',
+    });
+  }
+
+  return checks;
+}
+
+async function checkHook(settings: Record<string, unknown> | null): Promise<Check[]> {
+  const checks: Check[] = [...(await checkHookScript())];
+  const hookFilePresent = await fileExists(HOOK_PATH);
+
+  const hooks = settings?.hooks as {
+    PostToolUse?: Array<{ hooks?: Array<{ command?: string }> }>;
+    PreToolUse?: Array<{ hooks?: Array<{ command?: string }> }>;
+  } | undefined;
+
+  const registeredPost = (hooks?.PostToolUse ?? []).some(hookEntryUsesStarlog);
+  const registeredPre = (hooks?.PreToolUse ?? []).some(hookEntryUsesStarlog);
+
+  if (!registeredPost) {
+    checks.push({ level: 'warn', label: 'PostToolUse hook (install vet)', detail: 'not registered — run `starlog init`' });
+  } else if (!hookFilePresent) {
+    checks.push({ level: 'fail', label: 'PostToolUse hook', detail: 'registered in settings but script file is missing' });
+  } else {
+    checks.push({ level: 'ok', label: 'PostToolUse hook (install vet)', detail: 'registered for Bash installs' });
+  }
+
+  if (!registeredPre) {
+    checks.push({ level: 'warn', label: 'PreToolUse hook (DIY detect)', detail: 'not registered — run `starlog init`' });
+  } else if (!hookFilePresent) {
+    checks.push({ level: 'fail', label: 'PreToolUse hook', detail: 'registered in settings but script file is missing' });
+  } else {
+    checks.push({ level: 'ok', label: 'PreToolUse hook (DIY detect)', detail: 'registered for Write|Edit|MultiEdit' });
+  }
+
+  if (hookFilePresent && !registeredPost && !registeredPre) {
     checks.push({ level: 'warn', label: 'Hook registration', detail: 'script exists but not registered in settings.json' });
   }
 
@@ -255,22 +271,40 @@ async function fileHasMarker(p: string): Promise<boolean> {
 }
 
 async function checkProjectAgents(projectDir: string): Promise<Check[]> {
+  const checks: Check[] = [];
   const cursor = await fileExists(join(projectDir, '.cursor', 'rules', 'starlog.mdc'));
+  const cursorHooks = await fileExists(join(projectDir, '.cursor', 'hooks.json'));
   const copilot = await fileHasMarker(join(projectDir, '.github', 'copilot-instructions.md'));
+  const copilotHooks = await fileExists(join(projectDir, '.github', 'hooks', 'starlog.json'));
   const codex = await fileHasMarker(join(projectDir, 'AGENTS.md'));
   const claudeMd = await fileHasMarker(join(projectDir, 'CLAUDE.md'));
 
   const configured = [
-    cursor && 'Cursor',
+    cursor && 'Cursor rule',
     copilot && 'Copilot',
     codex && 'Codex',
     claudeMd && 'CLAUDE.md',
   ].filter(Boolean) as string[];
 
   if (configured.length === 0) {
-    return [{ level: 'warn', label: 'Project agents', detail: 'none configured in this directory' }];
+    checks.push({ level: 'warn', label: 'Project agents', detail: 'none configured in this directory' });
+  } else {
+    checks.push({ level: 'ok', label: 'Project agents', detail: configured.join(', ') });
   }
-  return [{ level: 'ok', label: 'Project agents', detail: configured.join(', ') }];
+
+  if (cursor && !cursorHooks) {
+    checks.push({ level: 'warn', label: 'Cursor hooks', detail: 'rule present but .cursor/hooks.json missing — run `starlog init`' });
+  } else if (cursorHooks) {
+    checks.push({ level: 'ok', label: 'Cursor hooks', detail: 'DIY detect + install vet configured' });
+  }
+
+  if (copilot && !copilotHooks) {
+    checks.push({ level: 'warn', label: 'Copilot hooks', detail: 'instructions present but .github/hooks/starlog.json missing — run `starlog init`' });
+  } else if (copilotHooks) {
+    checks.push({ level: 'ok', label: 'Copilot hooks', detail: 'DIY detect + install vet configured' });
+  }
+
+  return checks;
 }
 
 // ── Ranking mode (informational) ─────────────────────────────────────────────

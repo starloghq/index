@@ -115,7 +115,9 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
     expect(stdout).toMatch(/\[ok\] Corpus — \d+ manifests loaded/);
     // The two un-wired pieces are flagged as warnings ([!]) that point at init.
     expect(stdout).toContain('[!]  Claude Code MCP — not configured — run `starlog init`');
-    expect(stdout).toContain('[!]  PostToolUse hook — not installed — run `starlog init`');
+    expect(stdout).toContain('[!]  Hook script — not installed — run `starlog init`');
+    expect(stdout).toContain('[!]  PostToolUse hook (install vet) — not registered — run `starlog init`');
+    expect(stdout).toContain('[!]  PreToolUse hook (DIY detect) — not registered — run `starlog init`');
     // Summary PHRASE (not the warning count, which drifts with cwd-detected agents).
     expect(stdout).toContain('All critical checks passed');
   });
@@ -158,7 +160,7 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
       const { status, stdout } = runDoctor(cwd, home);
 
       // The script itself is fine ([ok]) but the missing registration is a WARNING ([!]).
-      expect(stdout).toContain('[ok] PostToolUse hook — script present and valid');
+      expect(stdout).toContain('[ok] Hook script — present and valid');
       expect(stdout).toContain('[!]  Hook registration — script exists but not registered in settings.json');
       // Warning-only state: the overall run still passes.
       expect(stdout).toContain('All critical checks passed');
@@ -234,7 +236,7 @@ describe('starlog doctor — install-state diagnostics (e2e, spawned binary)', (
     expect(stdout).toContain('legacy self-contained hook');
     expect(stdout).toContain('starlog init');
     // The [ok] script line still prints — the warning is additive, not a replacement.
-    expect(stdout).toContain('script present and valid');
+    expect(stdout).toContain('Hook script — present and valid');
   });
 
   // 2e. VERSION STALENESS — doctor nudges when the registry advertises a newer
