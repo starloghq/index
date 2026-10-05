@@ -1,0 +1,60 @@
+{
+  "id": "passport",
+  "name": "Passport",
+  "repo": "jaredhanson/passport",
+  "ecosystem": "npm",
+  "category": "authentication",
+  "solves": "Provides unobtrusive, middleware-based authentication for Node.js with a strategy plugin model covering hundreds of OAuth/OIDC, local, JWT, and enterprise providers \u2014 letting you compose auth into Express-style apps without a monolithic framework.",
+  "stack_affinity": [
+    "express",
+    "koa",
+    "node",
+    "connect",
+    "nest.js"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "Express and Connect-style Node APIs that need pluggable strategies (local, OAuth, SAML, JWT) via middleware",
+    "Legacy or greenfield Node servers that already use passport-* strategy packages in the ecosystem",
+    "Teams that want maximum control over session serialization and route-level auth hooks",
+    "APIs that authenticate with many providers via the large passport-strategy ecosystem",
+    "NestJS apps using @nestjs/passport for Guard-based authentication"
+  ],
+  "skip_when": [
+    "You want pre-built auth UI, user management dashboards, and hosted MFA without building them",
+    "You are on Next.js App Router and prefer Auth.js, Better Auth, or Clerk over Express middleware",
+    "You need an actively evolving TypeScript-first auth framework with modern passkey/org plugins out of the box",
+    "You prefer not to assemble session stores, strategy packages, and CSRF protection yourself",
+    "Upstream commit cadence is too slow for your risk tolerance \u2014 Passport core updates infrequently"
+  ],
+  "hosted_alternative": {
+    "name": "Auth0",
+    "manifest_id": "auth0",
+    "pricing_summary": "Free tier for development; paid plans scale with monthly active users and enterprise features"
+  },
+  "alternative_ids": [
+    "nextauth",
+    "better-auth",
+    "clerk",
+    "auth0",
+    "lucia",
+    "supabase-auth",
+    "firebase-auth",
+    "aws-cognito",
+    "custom-authentication"
+  ],
+  "health": {
+    "stars": 23536,
+    "weekly_downloads": 7461223,
+    "last_commit": "2024-08-16T21:56:08Z",
+    "contributors": 38,
+    "license": "MIT",
+    "open_issues": 398
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": false,
+    "maintenance_status": "slowing"
+  }
+}

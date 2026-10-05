@@ -1,0 +1,61 @@
+{
+  "id": "unstorage",
+  "name": "unstorage",
+  "repo": "unjs/unstorage",
+  "ecosystem": "npm",
+  "category": "caching",
+  "solves": "Provides a unified async key-value storage API with dozens of drivers (memory, FS, Redis, Cloudflare, Netlify, Vercel KV, etc.), mounting, watching, and metadata \u2014 popular in the UnJS/Nitro/Nuxt ecosystem.",
+  "stack_affinity": [
+    "nuxt",
+    "nitro",
+    "h3",
+    "node",
+    "cloudflare-workers",
+    "vercel",
+    "netlify",
+    "bun"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Nuxt/Nitro apps that want one storage API across local, Redis, and edge drivers",
+    "Projects that swap storage backends per environment without rewriting call sites",
+    "Edge-friendly key-value access with driver mounting and prefixes",
+    "Caching and persistence layers in UnJS tooling",
+    "Teams that want Keyv-like portability with a larger modern driver set"
+  ],
+  "skip_when": [
+    "You need advanced Redis-only features (streams, cluster-aware scripting) via a raw client",
+    "You only need a synchronous in-process LRU \u2014 lru-cache is lighter",
+    "You want a full HTTP response caching framework with stampede protection (cacheable)",
+    "Your stack has no UnJS affinity and Keyv already covers your backends",
+    "You require strict transactional semantics beyond simple KV"
+  ],
+  "hosted_alternative": {
+    "name": "Upstash Redis",
+    "manifest_id": "upstash-redis",
+    "pricing_summary": "Pay-per-request serverless Redis with a free tier; works as an unstorage driver target"
+  },
+  "alternative_ids": [
+    "keyv",
+    "lru-cache",
+    "ioredis",
+    "node-redis",
+    "cacheable",
+    "upstash-redis",
+    "custom-caching"
+  ],
+  "health": {
+    "stars": 2627,
+    "weekly_downloads": 23322424,
+    "last_commit": "2026-06-29T17:46:43Z",
+    "contributors": 98,
+    "license": "MIT",
+    "open_issues": 130
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

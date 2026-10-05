@@ -52,7 +52,7 @@ You can't fix recall by prompting harder. **Starlog puts authoritative, dated fa
 - **`starlog facts` / `starlog search` / `starlog advise` / `starlog patterns` CLI** — the same facts, discovery, and migrate-or-packageize advisories from your terminal.
 - **Runs on your machine** — the engine and corpus are local; the default (keyless) path needs no account, no API key, and no network. Setting `STARLOG_API_KEY` opts into the hosted facts/search tiers (with local fallback) — get a key at [starlog.dev](https://starlog.dev) and wire it with `starlog init --api-key <key>`; anonymous, opt-out usage telemetry is the only thing sent otherwise — see [Telemetry](#telemetry).
 
-This repo ships the engine plus a curated **facts corpus** and a discovery corpus of **26 capability manifests across 7 categories** (including authentication playbooks for migration).
+This repo ships the engine plus a curated **facts corpus** and a discovery corpus of **51 capability manifests across 7 categories** (including authentication playbooks for migration).
 
 ## Quick start
 

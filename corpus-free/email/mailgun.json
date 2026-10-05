@@ -1,0 +1,52 @@
+{
+  "id": "mailgun",
+  "name": "Mailgun",
+  "repo": "mailgun/mailgun.js",
+  "ecosystem": "npm",
+  "category": "email",
+  "solves": "Provides the official Mailgun JavaScript SDK for sending, validating, and tracking email via Mailgun's HTTP API, including domains, templates, mailing lists, and event webhooks.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "next.js",
+    "nest.js"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Apps needing a mature ESP API for transactional and moderate-volume outbound email",
+    "Teams that want email validation, mailing lists, and inbound routing in one vendor",
+    "Node backends integrating Mailgun domains, templates, and delivery webhooks",
+    "Migrations from SMTP-based Nodemailer setups to an HTTP ESP",
+    "Products that already use Mailgun EU or US regions for data residency"
+  ],
+  "skip_when": [
+    "You want React-email-centric DX with minimal ESP surface area (consider Resend)",
+    "You need pure self-hosted sending with no ESP contract",
+    "Cost optimization at high volume points to Amazon SES on AWS",
+    "You only need a thin SMTP transport and Nodemailer is enough",
+    "You prefer Postmark's transactional-only focus and message streams model"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "resend",
+    "sendgrid",
+    "postmark",
+    "amazon-ses",
+    "nodemailer",
+    "custom-email"
+  ],
+  "health": {
+    "stars": 549,
+    "weekly_downloads": 1084580,
+    "last_commit": "2026-07-09T09:42:13Z",
+    "contributors": 42,
+    "license": "MIT",
+    "open_issues": 15
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

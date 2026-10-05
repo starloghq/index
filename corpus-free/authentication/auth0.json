@@ -30,6 +30,7 @@
   "alternative_ids": [
     "clerk",
     "nextauth",
+    "better-auth",
     "lucia",
     "supabase-auth",
     "firebase-auth",

@@ -1,0 +1,57 @@
+{
+  "id": "graphile-worker",
+  "name": "Graphile Worker",
+  "repo": "graphile/worker",
+  "ecosystem": "npm",
+  "category": "background-jobs",
+  "solves": "Provides a high-performance PostgreSQL job queue for Node.js designed for Graphile/PostGraphile stacks, with efficient SKIP LOCKED job claiming, cron, migrations, and the ability to enqueue jobs from SQL triggers.",
+  "stack_affinity": [
+    "node",
+    "postgresql",
+    "postgraphile",
+    "express",
+    "fastify"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "PostGraphile/Graphile stacks that want jobs tightly integrated with Postgres",
+    "Systems that enqueue work from SQL triggers/functions into a Node worker fleet",
+    "High-performance Postgres job processing with careful locking and throughput tuning",
+    "Teams already invested in Graphile tooling and migrations",
+    "Replace-Redis queue needs when Postgres is the system of record"
+  ],
+  "skip_when": [
+    "You want a hosted serverless job platform (Inngest/Trigger.dev) with zero PG ops",
+    "You need Redis-based features or BullMQ's flow producer ecosystem",
+    "Your app is not on PostgreSQL",
+    "You prefer pg-boss's simpler API over Graphile Worker conventions",
+    "You only need occasional cron in a single Node process"
+  ],
+  "hosted_alternative": {
+    "name": "Inngest",
+    "manifest_id": "inngest",
+    "pricing_summary": "Free tier for hobby; paid plans scale with executions and concurrency"
+  },
+  "alternative_ids": [
+    "pg-boss",
+    "bullmq",
+    "inngest",
+    "trigger-dev",
+    "agenda",
+    "custom-background-jobs"
+  ],
+  "health": {
+    "stars": 2348,
+    "weekly_downloads": 364216,
+    "last_commit": "2026-07-08T08:00:10Z",
+    "contributors": 60,
+    "license": "MIT",
+    "open_issues": 42
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

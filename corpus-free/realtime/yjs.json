@@ -1,0 +1,62 @@
+{
+  "id": "yjs",
+  "name": "Yjs",
+  "repo": "yjs/yjs",
+  "ecosystem": "npm",
+  "category": "realtime",
+  "solves": "Provides high-performance CRDT shared types for collaborative editors and multiplayer document state, with providers for WebSocket, WebRTC, TipTap, Monaco, and CodeMirror \u2014 a conflict-free sync engine, not a generic pub/sub transport.",
+  "stack_affinity": [
+    "react",
+    "next.js",
+    "node",
+    "browser",
+    "tiptap",
+    "monaco",
+    "codemirror",
+    "svelte",
+    "vue"
+  ],
+  "integration_effort": "significant",
+  "best_for": [
+    "Collaborative rich-text, canvas, or code editors needing conflict-free realtime sync",
+    "Multiplayer apps where CRDTs beat OT for offline-first merging",
+    "Products integrating TipTap/ProseMirror, Monaco, or CodeMirror with Yjs bindings",
+    "Custom awareness/presence layers on top of shared Y.Doc types",
+    "Teams that want open-source collaboration primitives rather than a full hosted suite"
+  ],
+  "skip_when": [
+    "You only need simple pub/sub events or chat without collaborative document state \u2014 use Socket.IO or Ably",
+    "You want a fully managed multiplayer room product (Liveblocks) with less CRDT expertise",
+    "Your problem is IoT device messaging (MQTT) rather than shared mutable document state",
+    "You need only one-way server push (SSE) without peer document merging",
+    "Integration budget cannot absorb CRDT modeling and sync-provider operations"
+  ],
+  "hosted_alternative": {
+    "name": "Liveblocks",
+    "manifest_id": "liveblocks",
+    "pricing_summary": "Free tier for small multiplayer apps; paid plans scale with monthly active users and rooms"
+  },
+  "alternative_ids": [
+    "liveblocks",
+    "partykit",
+    "socket-io",
+    "ably",
+    "pusher",
+    "supabase-realtime",
+    "custom-realtime"
+  ],
+  "health": {
+    "stars": 22260,
+    "weekly_downloads": 7166199,
+    "last_commit": "2026-07-18T11:04:18Z",
+    "contributors": 129,
+    "license": "MIT",
+    "open_issues": 133
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

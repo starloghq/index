@@ -8,3 +8,4 @@ dist/
 .planning/
 .starlog/
 *.bak
+.codegraph/

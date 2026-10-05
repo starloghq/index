@@ -1,0 +1,59 @@
+{
+  "id": "node-redis",
+  "name": "node-redis (redis)",
+  "repo": "redis/node-redis",
+  "ecosystem": "npm",
+  "category": "caching",
+  "solves": "Provides the official Redis / Valkey client for Node.js (npm package `redis`) with modern Promise APIs, clustering, Sentinel, Lua scripting, Pub/Sub, streams, and first-class TypeScript types — suitable for shared caching and general Redis access.",
+  "stack_affinity": [
+    "node",
+    "express",
+    "fastify",
+    "nest.js",
+    "next.js",
+    "bun"
+  ],
+  "integration_effort": "easy",
+  "best_for": [
+    "Applications that want the official Redis Node client with broad command coverage",
+    "Caching, session stores, rate limiting, and Pub/Sub on Redis/Valkey",
+    "Teams that prefer the maintained `redis` package over older clients",
+    "Cluster and Sentinel deployments needing an official client path",
+    "TypeScript services that want typed Redis commands without ioredis"
+  ],
+  "skip_when": [
+    "You specifically need ioredis APIs/ecosystem middleware already in your codebase",
+    "You only need an in-process LRU and do not want Redis infrastructure",
+    "You want a multi-backend key-value abstraction (Keyv/unstorage) rather than Redis-specific APIs",
+    "You are on edge/serverless and prefer HTTP Redis (Upstash) over TCP clients",
+    "Your runtime cannot open persistent TCP connections to Redis"
+  ],
+  "hosted_alternative": {
+    "name": "Upstash Redis",
+    "manifest_id": "upstash-redis",
+    "pricing_summary": "Pay-per-request serverless Redis with a free tier; scales without connection pooling pain on edge"
+  },
+  "alternative_ids": [
+    "ioredis",
+    "keyv",
+    "upstash-redis",
+    "lru-cache",
+    "unstorage",
+    "cacheable",
+    "custom-caching"
+  ],
+  "health": {
+    "stars": 17570,
+    "weekly_downloads": 12182506,
+    "last_commit": "2026-07-29T16:16:00Z",
+    "contributors": 311,
+    "license": "MIT",
+    "open_issues": 198
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}

@@ -47,7 +47,8 @@
     "better-sqlite3",
     "custom-orm",
     "postgres-js",
-    "slonik"
+    "slonik",
+    "mongoose"
   ],
   "health": {
     "stars": 34570,

@@ -21,11 +21,11 @@
     "Microservice-to-microservice low-latency communication over persistent connections"
   ],
   "skip_when": [
-    "You need automatic reconnection, multiplexing, rooms, namespaces, or broadcasting abstractions out of the box — use Socket.IO or a higher-level library",
+    "You need automatic reconnection, multiplexing, rooms, namespaces, or broadcasting abstractions out of the box \u2014 use Socket.IO or a higher-level library",
     "Your client is a browser and you need fallback transports (long-polling) for environments without WebSocket support",
-    "You need a fully managed real-time service with presence, pub/sub channels, and authentication built in — use Pusher, Ably, or Supabase Realtime",
-    "You want a collaborative editing or CRDT framework — use Yjs or Liveblocks instead",
-    "You need isomorphic client code that runs in both Node.js and the browser without a wrapper — ws does not work in browsers"
+    "You need a fully managed real-time service with presence, pub/sub channels, and authentication built in \u2014 use Pusher, Ably, or Supabase Realtime",
+    "You want a collaborative editing or CRDT framework \u2014 use Yjs or Liveblocks instead",
+    "You need isomorphic client code that runs in both Node.js and the browser without a wrapper \u2014 ws does not work in browsers"
   ],
   "hosted_alternative": null,
   "alternative_ids": [
@@ -37,7 +37,8 @@
     "custom-realtime",
     "centrifugo",
     "mqtt",
-    "yjs"
+    "yjs",
+    "liveblocks"
   ],
   "health": {
     "stars": 22769,

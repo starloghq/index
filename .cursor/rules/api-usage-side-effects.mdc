@@ -1,0 +1,37 @@
+---
+description: Rules for safely using existing APIs and avoiding unintended behavior
+globs: **/*.js,**/*.ts,**/*.tsx,**/*.py
+alwaysApply: false
+---
+
+# API Usage and Side Effects
+
+- Inspect existing APIs before reusing them.
+
+- Understand:
+  - purpose
+  - inputs
+  - outputs
+  - side effects
+  - cost
+  - latency
+  - existing callers
+
+- Do not enable expensive operations unless their output is actually consumed.
+
+- Avoid unnecessary:
+  - network calls
+  - LLM enrichment
+  - indexing passes
+  - database writes
+
+- Use APIs matching the intended mutation:
+  - status updates for status changes
+  - create/upsert operations only for entity creation or modification
+
+- Check whether another layer already performs an operation before adding a duplicate call.
+
+- Prevent:
+  - duplicate writes
+  - double counting
+  - repeated state transitions

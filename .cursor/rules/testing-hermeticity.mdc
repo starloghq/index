@@ -1,0 +1,31 @@
+---
+alwaysApply: true
+---
+# Testing Hermeticity
+
+Unit tests must be deterministic and independent of developer machines.
+
+- Never depend on:
+  - live network services
+  - external APIs
+  - developer home directories
+  - local credentials
+  - ambient environment state
+
+- Mock external dependencies including:
+  - HTTP requests
+  - LLM calls
+  - databases
+  - filesystem-backed stores
+  - cloud services
+
+- Tests must pass identically with credentials present and absent.
+
+- Use temporary directories and isolated fixtures instead of real user data.
+
+- Before submitting changes, run:
+  - type checks
+  - unit tests
+  - builds
+  - packaging checks
+  - smoke tests

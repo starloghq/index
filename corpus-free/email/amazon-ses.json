@@ -1,0 +1,53 @@
+{
+  "id": "amazon-ses",
+  "name": "Amazon SES (AWS SDK v3)",
+  "repo": "aws/aws-sdk-js-v3",
+  "ecosystem": "npm",
+  "category": "email",
+  "solves": "Provides the AWS SDK v3 client for Amazon Simple Email Service (`@aws-sdk/client-ses`) to send transactional and bulk email via the SES API, with configuration sets, templates, and IAM-authenticated access from Node.js.",
+  "stack_affinity": [
+    "node",
+    "aws-lambda",
+    "express",
+    "nest.js",
+    "serverless"
+  ],
+  "integration_effort": "moderate",
+  "best_for": [
+    "High-volume transactional email on AWS where SES pricing and IAM auth matter",
+    "Lambda and serverless workers sending mail through `@aws-sdk/client-ses` or SES v2 APIs",
+    "Teams already operating in AWS that want email without a third-party ESP contract",
+    "Organizations needing configuration sets and bounce/complaint event publishing into SNS or Firehose",
+    "Cost-sensitive workloads past startup ESP free tiers"
+  ],
+  "skip_when": [
+    "You want React email templates and a modern ESP DX with minimal AWS setup (consider Resend)",
+    "You are not on AWS and do not want domain verification, IAM, and SES sandbox limits",
+    "You need a self-hosted SMTP relay with Nodemailer against your own MTA",
+    "You prefer Postmark or Mailgun's focused deliverability UX over the AWS console and raw SDK",
+    "Your stack is non-JavaScript and you would use a different SES language SDK"
+  ],
+  "hosted_alternative": null,
+  "alternative_ids": [
+    "resend",
+    "sendgrid",
+    "postmark",
+    "mailgun",
+    "nodemailer",
+    "custom-email"
+  ],
+  "health": {
+    "stars": 3648,
+    "weekly_downloads": 3604130,
+    "last_commit": "2026-07-29T20:42:17Z",
+    "contributors": 169,
+    "license": "Apache-2.0",
+    "open_issues": 140
+  },
+  "quality": {
+    "has_tests": true,
+    "has_docs": true,
+    "has_types": true,
+    "maintenance_status": "active"
+  }
+}
