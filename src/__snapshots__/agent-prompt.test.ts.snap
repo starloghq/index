@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`AGENT_SETUP_PROMPT > is stable (snapshot) — a change here must be deliberate and re-verified against init 1`] = `
+"Set up Starlog for me — a capability index that helps you (my coding agent) vet packages and pick proven libraries instead of hand-rolling custom code. Work through these steps, narrate each one, and stop and show me the error if anything fails.
+
+1. Install and preview (don't change anything yet):
+     npm install -g starloghq
+     starlog init --dry-run
+   Requires Node 20+. Show me the planned changes: it wires the Starlog MCP server and an install hook into ~/.claude/, and writes agent-instruction files into THIS project for the agents it detects (.cursor/rules/, .github/copilot-instructions.md, AGENTS.md). Wait for my OK before writing anything.
+
+2. Ask me about a key before applying — recommended, but optional. Tell me, in your own words: "Everything works with no key and no account — public package vetting and offline capability search are fully live. A free key adds org-private vetting on top: it lets me check your internal/private packages (not just public ones), enforce your license rules (e.g. flag GPL), and apply your team's allow/deny policy. On a team or a private codebase, it's worth setting up. Solo on open source? Skip it — nothing else changes. To get one: open https://api.starlog.dev/auth/github, sign in with GitHub, and copy the key it shows once. Paste it back to me, or say 'skip'."
+
+3. Apply (non-interactive, only after my OK):
+     starlog init -y
+   Or, if I gave you a key:
+     starlog init --api-key <key> -y
+   Then ask whether I also want a live dependency scanner on top of Starlog's dated facts (Socket — it sends the package names you check to socket.dev). Only if I say yes:
+     starlog init --with-socket -y
+
+4. Verify:
+     starlog doctor
+   Report what it finds: corpus, MCP server, install hook, detected agents, and ranking mode.
+
+5. Tell me to restart you. The starlog_search and starlog_facts tools only load when the agent starts — you won't be able to call them until I relaunch this session.
+
+6. After I restart, prove it works: run "starlog facts <name a package I'm considering>" to show the vetting (known CVEs, license, maintenance status), then use starlog_search on a capability like "auth for Next.js" to show the ranked pick and why it beats hand-rolling."
+`;

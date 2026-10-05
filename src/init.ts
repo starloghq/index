@@ -17,6 +17,8 @@ const STARLOG_END_MARKER = '<!-- starlog:end -->';
 // Shared instruction text used by all agent configs
 const STARLOG_INSTRUCTIONS = `Before recommending or installing a package, vet it with the \`starlog_facts\` MCP tool. It returns known CVEs and supply-chain incidents, SPDX license + risk, and maintenance status (active / deprecated / abandoned / compromised), each dated. Trust it over training-data recall — your knowledge of a package's current status may be stale.
 
+Starlog facts are point-in-time — each is dated ("as of"), not a live feed. If a live dependency scanner is available (e.g. Socket's \`depscore\` MCP tool, wired by \`starlog init --with-socket\`), also run it before adding a dependency to catch anything disclosed since.
+
 Use \`starlog_search\` to discover candidate packages for a capability, then vet the named candidate with \`starlog_facts\` before adopting it.
 
 When you detect DIY or repeated capability code, call \`starlog_advise\` before building more custom code or extracting a reusable package. If it advises MIGRATE, use a known safe library instead of packageizing DIY code. Only packageize when \`starlog_advise\` returns PACKAGEIZE (no safe corpus alternative).`;
@@ -105,6 +107,38 @@ async function removeMcpServer(): Promise<{ changed: boolean }> {
   const servers = settings.mcpServers as Record<string, unknown> | undefined;
   if (!servers || !('starlog' in servers)) return { changed: false };
   delete servers.starlog;
+  await writeSettingsJson(settings);
+  return { changed: true };
+}
+
+// ── Socket MCP (opt-in live dependency scanner, #67) ────────────────────
+
+/** Socket's free hosted MCP server (no key). Opt-in only: it sends package
+ *  names to a third party, and the default install makes no network calls. */
+export const SOCKET_MCP_SERVER = { type: 'http', url: 'https://mcp.socket.dev/' } as const;
+
+const isOurSocketEntry = (v: unknown) => JSON.stringify(v) === JSON.stringify(SOCKET_MCP_SERVER);
+
+/** Add the Socket entry. A `socket` entry the user already has (e.g. with their
+ *  own auth headers) is theirs — never overwritten. */
+async function configureSocketMcp(): Promise<{ changed: boolean }> {
+  const settings = await readSettingsJson();
+  if (!settings.mcpServers || typeof settings.mcpServers !== 'object') {
+    settings.mcpServers = {};
+  }
+  const servers = settings.mcpServers as Record<string, unknown>;
+  if ('socket' in servers) return { changed: false };
+  servers.socket = { ...SOCKET_MCP_SERVER };
+  await writeSettingsJson(settings);
+  return { changed: true };
+}
+
+/** Remove the Socket entry only if it is exactly the one Starlog wrote. */
+async function removeSocketMcp(): Promise<{ changed: boolean }> {
+  const settings = await readSettingsJson();
+  const servers = settings.mcpServers as Record<string, unknown> | undefined;
+  if (!servers || !isOurSocketEntry(servers.socket)) return { changed: false };
+  delete servers.socket;
   await writeSettingsJson(settings);
   return { changed: true };
 }
@@ -456,6 +490,12 @@ async function mcpServerAction(apiKey?: string): Promise<PlanAction> {
     : 'update';
 }
 
+/** Action for the opt-in Socket MCP entry; any existing `socket` entry is left as-is. */
+async function socketMcpAction(): Promise<PlanAction> {
+  const servers = ((await readSettingsJson()).mcpServers ?? {}) as Record<string, unknown>;
+  return 'socket' in servers ? 'unchanged' : 'create';
+}
+
 /** Action for the PostToolUse hook (file on disk + settings.json registration). */
 async function hookAction(): Promise<PlanAction> {
   let existing: string | null = null;
@@ -496,6 +536,14 @@ async function buildInstallPlan(
     action: await hookAction(),
     apply: installHookScript,
   });
+  if (opts.withSocket) {
+    items.push({
+      label: 'Claude Code · Socket MCP (live dependency scanner)',
+      path: tildify(SETTINGS_PATH),
+      action: await socketMcpAction(),
+      apply: configureSocketMcp,
+    });
+  }
 
   const detection = detectAgents({ projectDir });
 
@@ -562,6 +610,7 @@ interface InitOpts {
   yes?: boolean;
   dryRun?: boolean;
   apiKey?: string;
+  withSocket?: boolean;
 }
 
 /**
@@ -575,7 +624,7 @@ function isEphemeralInstall(): boolean {
 }
 
 /** Post-install guidance: what's active, what to do next, and any caveats. */
-function printPostInstallSummary(apiKey?: string): void {
+function printPostInstallSummary(apiKey?: string, withSocket?: boolean): void {
   console.log('\nDone! Next steps:');
   console.log('  1. Restart your AI coding agent so it loads the MCP server.');
   console.log('  2. Run `starlog doctor` to confirm everything is wired up.');
@@ -586,6 +635,10 @@ function printPostInstallSummary(apiKey?: string): void {
     console.log('\nRanking mode: keyword — offline, no key, no setup (the default).');
     console.log('Want hosted ranking (full corpus) + org-private facts? Get a key at https://starlog.dev, then:');
     console.log('  starlog init --api-key <key>');
+  }
+
+  if (withSocket) {
+    console.log('\nLive scanner: Socket MCP wired — your agent sends the package names it checks to mcp.socket.dev.');
   }
 
   console.log('\nYour agent will now vet packages with `starlog_facts` before adopting them.');
@@ -619,8 +672,10 @@ export async function runInit(opts: InitOpts): Promise<void> {
     // Global (Claude Code)
     const mcp = await removeMcpServer();
     const hook = await removeHookScript();
+    const socket = await removeSocketMcp();
     console.log(mcp.changed  ? '  [x] MCP server removed' : '  [=] MCP server was not configured');
     console.log(hook.changed ? '  [x] Hook removed' : '  [=] Hook was not installed');
+    if (socket.changed) console.log('  [x] Socket MCP server removed');
 
     // Project-level
     const md = await removeClaudeMd(projectDir);
@@ -661,7 +716,7 @@ export async function runInit(opts: InitOpts): Promise<void> {
 
   if (changes.length === 0) {
     console.log('\nEverything is already configured. No changes needed.');
-    printPostInstallSummary(apiKey);
+    printPostInstallSummary(apiKey, opts.withSocket);
     return;
   }
 
@@ -696,5 +751,5 @@ export async function runInit(opts: InitOpts): Promise<void> {
     await item.apply();
     console.log(`  [done] ${item.label}`);
   }
-  printPostInstallSummary(apiKey);
+  printPostInstallSummary(apiKey, opts.withSocket);
 }
