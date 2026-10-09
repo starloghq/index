@@ -32,7 +32,7 @@ export const MANIFEST_PACKAGE_ALIASES: Record<string, string> = {
   devcycle: '@devcycle/nodejs-server-sdk',
   'socket-io': 'socket.io',
   ably: 'ably',
-  pusher: 'pusher',
+  pusher: 'pusher-js',
   'supabase-realtime': '@supabase/supabase-js',
   ws: 'ws',
   cacheable: 'cacheable',
